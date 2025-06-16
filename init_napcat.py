@@ -95,7 +95,7 @@ def update_qq_in_config(path: str, qq_number: int):  # 确保 qq_number 是整�
         doc = tomlkit.parse(content)
         
         # 更新 qq 值
-        if 'qq_account' not in doc:
+        if 'bot' not in doc:
             doc['bot'] = tomlkit.table()  # 如果 bot 表不存在则创建
         doc['bot']['qq_account'] = qq_number  # qq_number 已经是整数
         

@@ -40,19 +40,8 @@ https://docs.mai-mai.org/manual/deployment/LPMM.html#%E9%BA%A6%E9%BA%A6%E5%AD%A6
 数据迁移教程：
 
 从旧版一键包迁移：
-1.迁移数据库：
 
-一键包的默认数据库文件在：一键包麦麦路径/mongodb/db
-
-例如：
-E:\MaimBot\MaiBot一键包-MaiCore0.6.1\MaiBot\mongodb\db
-
-其中, MaiBot一键包-MaiCore0.6.1  仅作为名称演示, 具体需要你查看压缩包名称
-
-将里面所有文件复制到新版一键包的同位置，即：
-MaiBot一键包v3.1-MaiCore0.6.1\MaiBot\mongodb\db
-
-2.迁移配置文件：
+1.迁移配置文件：
 
 注意！！！！配置文件在更新版本时可能会有非常大的改动！！
 
@@ -63,23 +52,3 @@ bot_config.toml
 lpmm_config.toml
 .env
 
-从手动部署迁移：
-
-1.迁移数据库：
-
-首先，需要找到你的MongoDB数据文件夹在哪，一般会在安装MongoDB的时候让你指定
-默认位置：C:\data\db
-
-同理，将里面所有文件复制到一键包数据库的位置，即：
-MaiBot一键包v3.1-MaiCore0.6.1\MaiBot\mongodb\db
-
-2.迁移配置文件：
-
-注意！！！！配置文件在更新版本时可能会有非常大的改动！！
-
-推荐方法：打开新旧配置文件，对照着一个一个复制
-
-需要迁移的配置文件：
-bot_config.toml
-lpmm_config.toml
-.env

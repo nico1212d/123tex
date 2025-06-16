@@ -3,7 +3,7 @@ import shutil
 import tomlkit  # 替换 tomli 和 tomli_w
 from dotenv import dotenv_values
 try:
-    from src.common.logger_manager import get_logger
+    from src.common.logger import get_logger
 except ImportError:
     from loguru import logger
 
@@ -95,7 +95,7 @@ def save_config(config):
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:  # 修改打开模式和编码
             tomlkit.dump(config, f)  # 使用 tomlkit.dump
-        logger.success("配置文件已保存")
+        logger.info("配置文件已保存")
     except Exception as e:
         logger.error(f"保存配置失败: {str(e)}")
         raise
@@ -145,7 +145,7 @@ def step_groups(config):
                 
                 with open(napcat_config_path, "w", encoding="utf-8") as f:
                     tomlkit.dump(napcat_config, f)
-                logger.success("已配置群组到MaiBot-Napcat-Adapter")
+                logger.info("已配置群组到MaiBot-Napcat-Adapter")
             else:
                 logger.warning(f"未找到MaiBot-Napcat-Adapter配置文件: {napcat_config_path}")
         except Exception as e:
@@ -537,7 +537,7 @@ def step_info_extraction():
         lpmm_data["info_extraction"] = info_extraction
         with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
             tomlkit.dump(lpmm_data, f)  # 使用 tomlkit.dump
-        logger.success(f"已保存info_extraction配置，workers={info_extraction['workers']}")
+        logger.info(f"已保存info_extraction配置，workers={info_extraction['workers']}")
     except Exception as e:
         logger.error(f"写入lpmm_config.toml info_extraction配置失败: {str(e)}")
 
@@ -591,7 +591,7 @@ def step_api_keys(config):
                 lpmm_data["llm_providers"] = providers
                 with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
                     tomlkit.dump(lpmm_data, f)  # 使用 tomlkit.dump
-                logger.success("已同步API密钥到lpmm_config.toml")
+                logger.info("已同步API密钥到lpmm_config.toml")
             except Exception as e:
                 logger.error(f"同步API密钥到lpmm_config.toml失败: {str(e)}")
     except Exception as e:

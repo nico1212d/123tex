@@ -5,7 +5,7 @@ from typing import Optional
 import re
 from init_napcat import create_napcat_config, create_onebot_config
 try:
-    from src.common.logger_manager import get_logger
+    from src.common.logger import get_logger
 except ImportError:
     from loguru import logger
 
@@ -123,7 +123,7 @@ def add_qq_number():
             create_napcat_config(qq)
             create_onebot_config(qq)
             
-            logger.success(f"QQ号 {qq} 配置已更新并创建必要文件！")
+            logger.info(f"QQ号 {qq} 配置已更新并创建必要文件！")
             return
     except Exception as e:
         logger.error(f"保存配置失败：{str(e)}")
@@ -232,7 +232,7 @@ def delete_maibot_memory():
             return False
         
         os.remove(db_path)
-        logger.success("麦麦的所有记忆已删除成功！")
+        logger.info("麦麦的所有记忆已删除成功！")
         return True
     except Exception as e:
         logger.error(f"错误：删除数据库文件时出现异常：{str(e)}")
@@ -289,7 +289,7 @@ def delete_knowledge_base():
             deleted_items.append("向量数据")
         
         if deleted_items:
-            logger.success(f"知识库删除成功！已删除：{', '.join(deleted_items)}")
+            logger.info(f"知识库删除成功！已删除：{', '.join(deleted_items)}")
         
         return True
     except Exception as e:
@@ -353,7 +353,7 @@ def start_maibot_learning():
 
 def show_menu():
     print("\n=== MaiBot 控制菜单 ===")
-    print("简易麦麦控制台 ")
+    print(" 麦麦控制台 ")
     print("制作By MaiBot Team @MotricSeven")
     print("======================")
     print("1. 启动所有服务")
@@ -368,10 +368,10 @@ def show_menu():
     print("======================")
     print("数据管理功能：")
     print("10. 麦麦删除所有记忆（删库）")
-    print("11. 从旧版(0.6.x)迁移数据库到0.7.x")
+    print("11. 从旧版(0.6.x)迁移数据库到0.8.x")
     print("12. 麦麦知识忘光光（删除知识库）")
-    print("13. 导入其他人的OpenIE文件")
-    print("14. 麦麦开始学习")
+    # print("13. 导入其他人的OpenIE文件")
+    # print("14. 麦麦开始学习")
     print("======================")
     print("0. 退出程序")
     print("======================")
@@ -413,7 +413,7 @@ def main():
                 ]):
                     logger.error("部分服务启动失败")
                 else:
-                    logger.success("所有组件启动成功！")
+                    logger.info("所有组件启动成功！")
 
             elif choice == '2':
                 qq = read_qq_from_config()
