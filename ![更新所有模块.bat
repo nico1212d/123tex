@@ -8,11 +8,11 @@ echo ================================================
 echo.
 
 REM 直接使用内置Python
-if exist "runtime\python31211\python.exe" (
-    set PYTHON_CMD=runtime\python31211\python.exe
+if exist "runtime\python31211\bin\python.exe" (
+    set PYTHON_CMD=runtime\python31211\bin\python.exe
     echo 使用内置Python: %PYTHON_CMD%
 ) else (
-    echo 错误：未找到内置Python (runtime\python31211\python.exe)
+    echo 错误：未找到内置Python (runtime\python31211\bin\python.exe)
     pause
     exit /b 1
 )
