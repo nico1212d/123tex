@@ -7,20 +7,29 @@ echo                  模块更新工具
 echo ================================================
 echo.
 
-REM 直接使用内置Python
-if exist "runtime\python31211\bin\python.exe" (
-    set PYTHON_CMD=runtime\python31211\bin\python.exe
-    echo 使用内置Python: %PYTHON_CMD%
+REM 设置Python路径
+set "PYTHON_PATH=%~dp0runtime\python31211\bin\python.exe"
+
+REM 检查Python是否存在
+if exist "%PYTHON_PATH%" (
+    echo 使用内置Python: %PYTHON_PATH%
 ) else (
-    echo 错误：未找到内置Python (runtime\python31211\bin\python.exe)
+    echo 错误：未找到内置Python
+    echo 路径: %PYTHON_PATH%
     pause
     exit /b 1
 )
 echo.
 
 REM 运行更新脚本
-%PYTHON_CMD% update_modules.py
+echo 开始执行更新脚本...
+"%PYTHON_PATH%" update_modules.py
 
 echo.
+if %errorlevel% equ 0 (
+    echo 更新完成！
+) else (
+    echo 更新过程中出现错误！
+)
 echo 按任意键退出...
 pause >nul
