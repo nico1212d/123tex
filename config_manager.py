@@ -3,17 +3,16 @@ import shutil
 import tomlkit  # 替换 tomli 和 tomli_w
 from dotenv import dotenv_values
 try:
-    from src.common.logger import get_logger
+    from modules.MaiBot.src.common.logger import get_logger  # 确保路径正确
+    logger = get_logger("init")
 except ImportError:
     from loguru import logger
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = os.path.join(BASE_DIR, "config", "bot_config.toml")
+CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot", "config", "bot_config.toml")
 BACKUP_PATH = CONFIG_PATH + ".bak"
-LPMM_CONFIG_PATH = os.path.join(BASE_DIR, "config", "lpmm_config.toml")
+LPMM_CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot", "config", "lpmm_config.toml")
 LPMM_BACKUP_PATH = LPMM_CONFIG_PATH + ".bak"
-
-logger = get_logger("init")
 
 def backup_config():
     try:
@@ -37,8 +36,18 @@ def backup_config():
 def load_config():
     try:
         if not os.path.exists(CONFIG_PATH):
-            logger.error(f"错误：找不到配置文件 {CONFIG_PATH}")
-            raise FileNotFoundError(f"配置文件 {CONFIG_PATH} 未找到")
+            # 尝试从模板创建配置文件
+            template_path = os.path.join(BASE_DIR, "modules", "MaiBot", "template", "bot_config_template.toml")
+            if os.path.exists(template_path):
+                config_dir = os.path.dirname(CONFIG_PATH)
+                if not os.path.exists(config_dir):
+                    os.makedirs(config_dir)
+                shutil.copy2(template_path, CONFIG_PATH)
+                logger.info(f"已从模板创建配置文件: {CONFIG_PATH}")
+            else:
+                logger.error(f"错误：找不到配置文件和模板文件 {CONFIG_PATH}")
+                raise FileNotFoundError(f"配置文件 {CONFIG_PATH} 未找到")
+        
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             user_config = tomlkit.load(f)
             return user_config
@@ -133,7 +142,7 @@ def step_groups(config):
     if groups:
         # 仅更新MaiBot-Napcat-Adapter的配置
         try:
-            napcat_config_path = os.path.join(BASE_DIR, "MaiBot-Napcat-Adapter", "config.toml")
+            napcat_config_path = os.path.join(BASE_DIR, "modules", "MaiBot-Napcat-Adapter", "config.toml")
             if os.path.exists(napcat_config_path):
                 with open(napcat_config_path, "r", encoding="utf-8") as f:
                     napcat_config = tomlkit.load(f)
@@ -519,6 +528,7 @@ def step_experimental(config):
 def step_info_extraction():
     print("\n=== 配置信息抽取线程数 ===")
     try:
+        ensure_lpmm_config_exists()
         lpmm_data = {}
         if os.path.exists(LPMM_CONFIG_PATH):
             with open(LPMM_CONFIG_PATH, "r", encoding="utf-8") as f:
@@ -544,15 +554,20 @@ def step_info_extraction():
 def step_api_keys(config):
     print("\n=== 配置API密钥 ===")
     try:
-        env_path = os.path.join(BASE_DIR, ".env")
+        env_path = os.path.join(BASE_DIR, "modules", "MaiBot", ".env")
         current_env = dotenv_values(env_path)
         if os.path.exists(env_path):
-            current_env = dotenv_values(env_path)
-        current_key = current_env.get("SILICONFLOW_KEY", "")
+            current_env = dotenv_values(env_path)        
+            current_key = current_env.get("SILICONFLOW_KEY", "")
         print("请前往 https://cloud.siliconflow.cn/account/ak 获取API秘钥")
         new_key = input(f"请输入SILICONFLOW_API密钥（当前：{current_key}，留空保持当前）：").strip()
         if new_key:
             os.environ["SILICONFLOW_KEY"] = new_key
+            # 确保 .env 文件的目录存在
+            env_dir = os.path.dirname(env_path)
+            if not os.path.exists(env_dir):
+                os.makedirs(env_dir)
+            
             env_lines = []
             if os.path.exists(env_path):
                 with open(env_path, "r", encoding="utf-8") as f:
@@ -566,9 +581,9 @@ def step_api_keys(config):
             if not found:
                 env_lines.append(f"\nSILICONFLOW_KEY={new_key}")
             with open(env_path, "w", encoding="utf-8") as f:
-                f.writelines(env_lines)
-            # 同步写入lpmm_config.toml
+                f.writelines(env_lines)# 同步写入lpmm_config.toml
             try:
+                ensure_lpmm_config_exists()
                 if os.path.exists(LPMM_CONFIG_PATH):
                     with open(LPMM_CONFIG_PATH, "r", encoding="utf-8") as f:
                         lpmm_data = tomlkit.load(f)  # 使用 tomlkit.load
@@ -806,6 +821,27 @@ def step_chat_details(config):
         logger.error(f"回复模式详细配置异常: {str(e)}")
     return config
 
+def ensure_lpmm_config_exists():
+    """确保LPMM配置文件存在，如果不存在则从模板创建"""
+    if not os.path.exists(LPMM_CONFIG_PATH):
+        template_path = os.path.join(BASE_DIR, "modules", "MaiBot", "template", "lpmm_config_template.toml")
+        if os.path.exists(template_path):
+            config_dir = os.path.dirname(LPMM_CONFIG_PATH)
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+            shutil.copy2(template_path, LPMM_CONFIG_PATH)
+            logger.info(f"已从模板创建LPMM配置文件: {LPMM_CONFIG_PATH}")
+        else:
+            # 如果模板不存在，创建一个基本的配置文件
+            config_dir = os.path.dirname(LPMM_CONFIG_PATH)
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir)
+            basic_config = tomlkit.document()
+            basic_config["info_extraction"] = {"workers": 10}
+            with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
+                tomlkit.dump(basic_config, f)
+            logger.info(f"已创建基本LPMM配置文件: {LPMM_CONFIG_PATH}")
+
 def main():
     print("---欢迎使用简易配置向导！---")
     print("请按照提示输入配置信息。")
@@ -848,4 +884,5 @@ def main():
         logger.critical(f"配置流程异常终止: {str(e)}")
 
 if __name__ == "__main__":
+    ensure_lpmm_config_exists()
     main()

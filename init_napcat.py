@@ -20,7 +20,7 @@ def create_napcat_config(qq_number):
     }
     
     # 确保目录存在
-    config_dir_1 = Path('./napcat/versions/9.9.19-34740/resources/app/napcat/config') #路径已更新
+    config_dir_1 = Path('./modules/napcat/versions/9.9.19-34740/resources/app/napcat/config') #路径已更新
     config_dir_1.mkdir(parents=True, exist_ok=True)
     
     # 创建配置文件
@@ -29,7 +29,7 @@ def create_napcat_config(qq_number):
         json.dump(config, f, indent=2, ensure_ascii=False)
 
     # 新增第二个配置路径
-    config_dir_2 = Path('./napcatframework/versions/9.9.19-34740/resources/app/LiteLoader/plugins/NapCat/config')
+    config_dir_2 = Path('./modules/napcatframework/versions/9.9.19-34740/resources/app/LiteLoader/plugins/NapCat/config')
     config_dir_2.mkdir(parents=True, exist_ok=True)
 
     # 在第二个路径创建配置文件
@@ -64,9 +64,8 @@ def create_onebot_config(qq_number):
     "enableLocalFile2Url": False,
     "parseMultMsg": False
     }
-    
-    # 确保目录存在
-    config_dir_1 = Path('./napcat/versions/9.9.19-34740/resources/app/napcat/config') #路径已更新
+      # 确保目录存在
+    config_dir_1 = Path('./modules/napcat/versions/9.9.19-34740/resources/app/napcat/config') #路径已更新
     config_dir_1.mkdir(parents=True, exist_ok=True)
     
     # 创建配置文件
@@ -75,7 +74,7 @@ def create_onebot_config(qq_number):
         json.dump(config, f, indent=2, ensure_ascii=False)
 
     # 新增第二个配置路径
-    config_dir_2 = Path('./napcatframework/versions/9.9.19-34740/resources/app/LiteLoader/plugins/NapCat/config')
+    config_dir_2 = Path('./modules/napcatframework/versions/9.9.19-34740/resources/app/LiteLoader/plugins/NapCat/config')
     config_dir_2.mkdir(parents=True, exist_ok=True)
 
     # 在第二个路径创建配置文件
@@ -85,6 +84,17 @@ def create_onebot_config(qq_number):
 
 def update_qq_in_config(path: str, qq_number: int):  # 确保 qq_number 是整数
     config_path = Path(path)
+    
+    # 如果配置文件不存在，尝试从模板创建
+    if not config_path.exists() and 'config' in str(config_path):
+        template_path = config_path.parent.parent / 'template' / config_path.name.replace('bot_config.toml', 'bot_config_template.toml')
+        if template_path.exists():
+            # 确保配置目录存在
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            # 从模板复制配置文件
+            import shutil
+            shutil.copy2(template_path, config_path)
+            print(f"已从模板创建配置文件: {config_path}")
     
     try:
         # 读取原始文件内容
@@ -120,11 +130,10 @@ def main():
             print('错误：请输入有效的QQ号（纯数字）')
             continue
         
-        qq_number_int = int(qq_input)  # 转换为整数
-
+        qq_number_int = int(qq_input)  # 转换为整数        
         try:
-            update_qq_in_config('./config/bot_config.toml', qq_number_int)
-            update_qq_in_config('./template/bot_config_template.toml', qq_number_int)
+            update_qq_in_config('./modules/MaiBot/config/bot_config.toml', qq_number_int)
+            update_qq_in_config('./modules/MaiBot/template/bot_config_template.toml', qq_number_int)
             create_onebot_config(qq_input)  # create_onebot_config 和 create_napcat_config 需要字符串类型的 qq
             create_napcat_config(qq_input)
             print(f'成功更新QQ号为：{qq_input}并创建所有必要的配置文件')

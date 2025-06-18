@@ -105,7 +105,7 @@ python -m pip install -i %PIP_INDEX_URL% --upgrade pip
 
 REM 安装依赖
 echo 正在安装依赖...
-pip install -i %PIP_INDEX_URL% -r requirements.txt --upgrade
+pip install -i %PIP_INDEX_URL% -r modules\MaiBot\requirements.txt --upgrade
 
 REM 调用init_napcat.py更新配置
 

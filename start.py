@@ -5,18 +5,28 @@ from typing import Optional
 import re
 from init_napcat import create_napcat_config, create_onebot_config
 try:
-    from src.common.logger import get_logger
+    from modules.MaiBot.src.common.logger import get_logger  # 确保路径正确
+    logger = get_logger("init")
 except ImportError:
     from loguru import logger
-
-logger = get_logger("init")
 
 def get_absolute_path(relative_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, relative_path)
 
 def read_qq_from_config() -> Optional[str]:
-    config_path = get_absolute_path('config/bot_config.toml')
+    config_path = get_absolute_path('modules/MaiBot/config/bot_config.toml')
+    template_path = get_absolute_path('modules/MaiBot/template/bot_config_template.toml')
+    
+    # 如果配置文件不存在，尝试从模板复制
+    if not os.path.exists(config_path) and os.path.exists(template_path):
+        config_dir = os.path.dirname(config_path)
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        import shutil
+        shutil.copy2(template_path, config_path)
+        logger.info(f"已从模板创建配置文件: {config_path}")
+    
     try:
         if not os.path.exists(config_path):
             logger.error(f"错误：找不到配置文件 {config_path}")
@@ -100,7 +110,7 @@ def create_cmd_window(cwd: str, command: str, use_venv: bool = False) -> bool:
         return False
 
 def check_napcat() -> bool:
-    napcat_path = get_absolute_path('napcat')
+    napcat_path = get_absolute_path('modules/napcat')
     napcat_exe = os.path.join(napcat_path, 'NapCatWinBootMain.exe')
     if not os.path.exists(napcat_exe):
         logger.error(f"错误：找不到NapCat可执行文件 {napcat_exe}")
@@ -108,7 +118,18 @@ def check_napcat() -> bool:
     return True
 
 def add_qq_number():
-    config_path = get_absolute_path('config/bot_config.toml')
+    config_path = get_absolute_path('modules/MaiBot/config/bot_config.toml')
+    template_path = get_absolute_path('modules/MaiBot/template/bot_config_template.toml')
+    
+    # 确保配置文件存在
+    if not os.path.exists(config_path) and os.path.exists(template_path):
+        config_dir = os.path.dirname(config_path)
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        import shutil
+        shutil.copy2(template_path, config_path)
+        logger.info(f"已从模板创建配置文件: {config_path}")
+    
     try:
         while True:
             qq = input("请输入要添加/修改的QQ号：").strip()
@@ -130,7 +151,7 @@ def add_qq_number():
 
 def install_vc_redist():
     """静默安装VC运行库"""
-    vc_path = get_absolute_path('onepackdata/vc_redist.x64.exe')
+    vc_path = get_absolute_path('modules/onepackdata/vc_redist.x64.exe')
     if not os.path.exists(vc_path):
         logger.warning(f"警告：未找到VC运行库安装包 {vc_path}")
         return
@@ -152,29 +173,29 @@ def launch_napcat(qq_number=None, headed_mode: bool = False):
             return False
 
     if headed_mode:
-        napcat_dir = get_absolute_path('./napcatframework')
+        napcat_dir = get_absolute_path('modules/napcatframework')
         napcat_exe_path = os.path.join(napcat_dir, 'NapCatWinBootMain.exe')
         if not os.path.exists(napcat_exe_path):
             logger.error(f"错误：找不到有头模式 NapCat 可执行文件 {napcat_exe_path}")
             return False
-        cwd = napcat_dir
+        cwd = napcat_dir        
         command = f'CHCP 65001 & start http://127.0.0.1:6099/webui/web_login?token=napcat & NapCatWinBootMain.exe {qq_number}'
         logger.info(f"尝试以有头模式启动 NapCat (QQ: {qq_number})")
     else: # Headless mode (default)
         if not check_napcat(): # check_napcat 检查 napcat/NapCatWinBootMain.exe
             return False # check_napcat() 会记录错误
-        cwd = get_absolute_path('napcat')
+        cwd = get_absolute_path('modules/napcat')
         command = f'CHCP 65001 & start http://127.0.0.1:6099/webui/web_login?token=napcat & NapCatWinBootMain.exe {qq_number}'
         logger.info(f"尝试以无头模式启动 NapCat (QQ: {qq_number})")
 
     return create_cmd_window(cwd, command)
 
 def launch_adapter():
-    adapter_path = get_absolute_path('MaiBot-Napcat-Adapter')
+    adapter_path = get_absolute_path('modules/MaiBot-Napcat-Adapter')
     return create_cmd_window(adapter_path, 'python main.py', use_venv=True)
 
 def launch_main_bot():
-    main_path = os.path.dirname(os.path.abspath(__file__))
+    main_path = get_absolute_path('modules/MaiBot')
     return create_cmd_window(main_path, 'python bot.py', use_venv=True)
 
 def update_qq_in_config(config_path: str, qq_number: str):
@@ -205,12 +226,12 @@ def launch_venv_cmd():
 
 def launch_sqlite_studio():
     """启动SQLiteStudio可视化数据库管理工具"""
-    sqlite_studio_path = get_absolute_path('SQLiteStudio/SQLiteStudio.exe')
+    sqlite_studio_path = get_absolute_path('modules/SQLiteStudio/SQLiteStudio.exe')
     if not os.path.exists(sqlite_studio_path):
         logger.error(f"错误：找不到SQLiteStudio可执行文件 {sqlite_studio_path}")
         return False
     try:
-        subprocess.Popen([sqlite_studio_path], cwd=get_absolute_path('SQLiteStudio'))
+        subprocess.Popen([sqlite_studio_path], cwd=get_absolute_path('modules/SQLiteStudio'))
         logger.info("SQLiteStudio 已启动")
         return True
     except Exception as e:
@@ -219,7 +240,7 @@ def launch_sqlite_studio():
 
 def delete_maibot_memory():
     """删除MaiBot的所有记忆（删除数据库文件）"""
-    db_path = get_absolute_path('data/MaiBot.db')
+    db_path = get_absolute_path('modules/MaiBot/data/MaiBot.db')
     if not os.path.exists(db_path):
         logger.warning("数据库文件不存在，麦麦原本就没有记忆")
         return True
@@ -240,7 +261,7 @@ def delete_maibot_memory():
 
 def migrate_database_from_old_version():
     """从旧版本(0.6.x)迁移数据库到0.7.x版本"""
-    migration_script = get_absolute_path('scripts/mongodb_to_sqlite.py')
+    migration_script = get_absolute_path('modules/MaiBot/scripts/mongodb_to_sqlite.py')
     if not os.path.exists(migration_script):
         logger.error(f"错误：找不到迁移脚本 {migration_script}")
         return False
@@ -249,7 +270,7 @@ def migrate_database_from_old_version():
         logger.info("正在从旧版本迁移数据库...")
         logger.info("请在弹出的命令行窗口中查看迁移进度")
         return create_cmd_window(
-            get_absolute_path('scripts'), 
+            get_absolute_path('modules/MaiBot/scripts'), 
             'python mongodb_to_sqlite.py', 
             use_venv=True
         )
@@ -259,8 +280,8 @@ def migrate_database_from_old_version():
 
 def delete_knowledge_base():
     """删除麦麦的知识库"""
-    rag_path = get_absolute_path('data/rag')
-    embedding_path = get_absolute_path('data/embedding')
+    rag_path = get_absolute_path('modules/MaiBot/data/rag')
+    embedding_path = get_absolute_path('modules/MaiBot/data/embedding')
     
     # 检查是否存在知识库文件夹
     rag_exists = os.path.exists(rag_path)
@@ -298,7 +319,7 @@ def delete_knowledge_base():
 
 def import_openie_file():
     """导入其他人的OpenIE文件"""
-    import_script = get_absolute_path('scripts/import_openie.py')
+    import_script = get_absolute_path('modules/MaiBot/scripts/import_openie.py')
     if not os.path.exists(import_script):
         logger.error(f"错误：找不到导入脚本 {import_script}")
         return False
@@ -307,7 +328,7 @@ def import_openie_file():
         logger.info("正在启动OpenIE文件导入工具...")
         logger.info("请在弹出的命令行窗口中按照提示选择要导入的文件")
         return create_cmd_window(
-            get_absolute_path('scripts'), 
+            get_absolute_path('modules/MaiBot/scripts'), 
             'python import_openie.py', 
             use_venv=True
         )
@@ -317,7 +338,7 @@ def import_openie_file():
 
 def start_maibot_learning():
     """麦麦开始学习（完整学习流程）"""
-    scripts_dir = get_absolute_path('scripts')
+    scripts_dir = get_absolute_path('modules/MaiBot/scripts')
     
     # 检查所需脚本是否存在
     required_scripts = [

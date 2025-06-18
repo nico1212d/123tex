@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+
+
+MaiBot/
+modules/
 # Distribution / packaging
 .Python
 build/
