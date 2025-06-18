@@ -2,66 +2,37 @@
 CHCP 65001 > nul
 setlocal enabledelayedexpansion
 
-echo 你需要选择启动方式，输入字母来选择:
-echo   V = 不知道什么意思就输入 V
-echo   C = 输入 C 使用 Conda 环境
-echo.
-choice /C CV /N /M "不知道什么意思就输入 V (C/V)?" /T 10 /D V
+echo 正在启动麦麦学习流程...
 
-set "ENV_TYPE="
-if %ERRORLEVEL% == 1 set "ENV_TYPE=CONDA"
-if %ERRORLEVEL% == 2 set "ENV_TYPE=VENV"
+REM 使用项目自带的 Python 环境
+set "PYTHON_PATH=%~dp0runtime\python31211\bin\python.exe"
 
-if "%ENV_TYPE%" == "CONDA" goto activate_conda
-if "%ENV_TYPE%" == "VENV" goto activate_venv
+REM 检查项目自带的 Python 是否存在
+if not exist "%PYTHON_PATH%" (
+    echo 错误：找不到项目自带的 Python 环境
+    echo 路径：%PYTHON_PATH%
+    echo 请确认 runtime\python31211\bin\python.exe 文件存在
+    pause
+    exit /b 1
+)
 
-REM 如果 choice 超时或返回意外值，默认使用 venv
-echo 警告: 无效选择或选择超时,默认使用 VENV.
-set "ENV_TYPE=VENV"
-goto activate_venv
+echo 使用项目自带的 Python: %PYTHON_PATH%
 
-:activate_conda
-    set /p CONDA_ENV_NAME="请输入要使用的 Conda 环境名称: "
-    if not defined CONDA_ENV_NAME (
-        echo 错误: 未输入 Conda 环境名称.
-        pause
-        exit /b 1
-    )
-    echo 选择: Conda '!CONDA_ENV_NAME!'
-    REM 激活Conda环境
-    call conda activate !CONDA_ENV_NAME!
-    if !ERRORLEVEL! neq 0 (
-        echo 错误: Conda环境 '!CONDA_ENV_NAME!' 激活失败. 请确保Conda已安装并正确配置, 且 '!CONDA_ENV_NAME!' 环境存在.
-        pause
-        exit /b 1
-    )
-    goto env_activated
+REM 验证 Python 版本
+"%PYTHON_PATH%" -c "import sys; print(f'Python 版本: {sys.version}'); exit(0) if sys.version_info[0] == 3 and sys.version_info[1] >= 11 else exit(1)"
+if %ERRORLEVEL% neq 0 (
+    echo 错误：Python 版本不符合要求
+    pause
+    exit /b 1
+)
 
-:activate_venv
-    echo 已选择: venv (默认或已选择).
-    REM 查找venv虚拟环境
-    set "venv_path=%~dp0venv\Scripts\activate.bat"
-    if not exist "%venv_path%" (
-        echo 错误: 未找到 venv.请确保 venv 目录与脚本位于同一路径下.
-        pause
-        exit /b 1
-    )
-    REM 激活虚拟环境
-    call "%venv_path%"
-    if %ERRORLEVEL% neq 0 (
-        echo 错误: 激活 venv 虚拟环境失败.
-        pause
-        exit /b 1
-    )
-    goto env_activated
+echo 环境已成功验证！开始学习流程...
 
-:env_activated
-echo 环境已成功激活！.
-
-REM --- 后续脚本执行 ---
+REM --- 麦麦学习脚本执行 ---
 
 REM 运行预处理脚本
-python "%~dp0scripts\raw_data_preprocessor.py"
+echo 正在执行数据预处理...
+"%PYTHON_PATH%" "%~dp0modules\MaiBot\scripts\raw_data_preprocessor.py"
 if %ERRORLEVEL% neq 0 (
     echo 错误: raw_data_preprocessor.py 执行失败.
     pause
@@ -69,7 +40,8 @@ if %ERRORLEVEL% neq 0 (
 )
 
 REM 运行信息提取脚本
-python "%~dp0scripts\info_extraction.py"
+echo 正在执行信息提取...
+"%PYTHON_PATH%" "%~dp0modules\MaiBot\scripts\info_extraction.py"
 if %ERRORLEVEL% neq 0 (
     echo 错误: info_extraction.py 执行失败.
     pause
@@ -77,12 +49,13 @@ if %ERRORLEVEL% neq 0 (
 )
 
 REM 运行OpenIE导入脚本
-python "%~dp0scripts\import_openie.py"
+echo 正在导入OpenIE数据...
+"%PYTHON_PATH%" "%~dp0modules\MaiBot\scripts\import_openie.py"
 if %ERRORLEVEL% neq 0 (
     echo 错误: import_openie.py 执行失败.
     pause
     exit /b 1
 )
 
-echo 所有处理步骤已完成！
+echo 🎉 麦麦学习流程已完成！
 pause

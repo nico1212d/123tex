@@ -85,21 +85,22 @@ def read_qq_from_config() -> Optional[str]:
         logger.error(f"错误：读取配置文件时出现异常：{str(e)}")
         return None
 
-def create_cmd_window(cwd: str, command: str, use_venv: bool = False) -> bool:
+def create_cmd_window(cwd: str, command: str) -> bool:
     try:
         if not os.path.exists(cwd):
             logger.error(f"错误：目录不存在 {cwd}")
             return False
             
-        venv_activate = ''
-        if use_venv:
-            venv_path = get_absolute_path('venv/Scripts/activate')
-            if not os.path.exists(venv_path):
-                logger.error(f"错误：虚拟环境不存在 {venv_path}")
-                return False
-            venv_activate = f'call "{venv_path}" && '
+        # 使用项目自带的 Python 环境
+        python_path = get_absolute_path('runtime/python31211/bin/python.exe')
         
-        full_command = f'start cmd /k "cd /d "{cwd}" && {venv_activate}{command}"'
+        # 如果命令中包含 python，则替换为完整路径
+        if command.startswith('python '):
+            command = command.replace('python ', f'"{python_path}" ', 1)
+        elif command == 'python':
+            command = f'"{python_path}"'
+        
+        full_command = f'start cmd /k "cd /d "{cwd}" && {command}"'
         subprocess.run(full_command, shell=True, check=True)
         return True
     except subprocess.CalledProcessError as e:
@@ -192,11 +193,11 @@ def launch_napcat(qq_number=None, headed_mode: bool = False):
 
 def launch_adapter():
     adapter_path = get_absolute_path('modules/MaiBot-Napcat-Adapter')
-    return create_cmd_window(adapter_path, 'python main.py', use_venv=True)
+    return create_cmd_window(adapter_path, 'python main.py')
 
 def launch_main_bot():
     main_path = get_absolute_path('modules/MaiBot')
-    return create_cmd_window(main_path, 'python bot.py', use_venv=True)
+    return create_cmd_window(main_path, 'python bot.py')
 
 def update_qq_in_config(config_path: str, qq_number: str):
     try:
@@ -217,12 +218,12 @@ def update_qq_in_config(config_path: str, qq_number: str):
 
 def launch_config_manager():
     config_path = os.path.dirname(os.path.abspath(__file__))
-    return create_cmd_window(config_path, 'python config_manager.py', use_venv=True)
+    return create_cmd_window(config_path, 'python config_manager.py')
 
-def launch_venv_cmd():
-    """启动一个激活了虚拟环境的CMD窗口"""
+def launch_python_cmd():
+    """启动一个使用项目 Python 环境的CMD窗口"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    return create_cmd_window(script_dir, "echo Virtual environment activated. You can now install packages or run scripts. Type 'exit' to close.", use_venv=True)
+    return create_cmd_window(script_dir, "echo Python environment ready. You can now run Python scripts. Type 'exit' to close.")
 
 def launch_sqlite_studio():
     """启动SQLiteStudio可视化数据库管理工具"""
@@ -265,14 +266,12 @@ def migrate_database_from_old_version():
     if not os.path.exists(migration_script):
         logger.error(f"错误：找不到迁移脚本 {migration_script}")
         return False
-    
     try:
         logger.info("正在从旧版本迁移数据库...")
         logger.info("请在弹出的命令行窗口中查看迁移进度")
         return create_cmd_window(
             get_absolute_path('modules/MaiBot/scripts'), 
-            'python mongodb_to_sqlite.py', 
-            use_venv=True
+            'python mongodb_to_sqlite.py'
         )
     except Exception as e:
         logger.error(f"错误：启动数据库迁移时出现异常：{str(e)}")
@@ -329,9 +328,7 @@ def import_openie_file():
         logger.info("请在弹出的命令行窗口中按照提示选择要导入的文件")
         return create_cmd_window(
             get_absolute_path('modules/MaiBot/scripts'), 
-            'python import_openie.py', 
-            use_venv=True
-        )
+            'python import_openie.py')
     except Exception as e:
         logger.error(f"错误：启动OpenIE导入工具时出现异常：{str(e)}")
         return False
@@ -366,7 +363,7 @@ def start_maibot_learning():
         )
         
         logger.info("请在弹出的命令行窗口中查看学习进度")
-        return create_cmd_window(scripts_dir, learning_command, use_venv=True)
+        return create_cmd_window(scripts_dir, learning_command)
         
     except Exception as e:
         logger.error(f"错误：启动麦麦学习流程时出现异常：{str(e)}")
@@ -469,12 +466,12 @@ def main():
                 logger.info("正在启动配置管理..." + ("成功" if launch_config_manager() else "失败"))
                 
             elif choice == '7':
-                install_vc_redist()
+                install_vc_redist()            
             elif choice == '8':
                 logger.info("正在启动SQLiteStudio..." + ("成功" if launch_sqlite_studio() else "失败"))
                 
             elif choice == '9':
-                logger.info("正在启动虚拟环境命令行..." + ("成功" if launch_venv_cmd() else "失败"))
+                logger.info("正在启动 Python 命令行..." + ("成功" if launch_python_cmd() else "失败"))
                 
             elif choice == '10':
                 logger.info("正在删除麦麦所有记忆..." + ("成功" if delete_maibot_memory() else "失败"))

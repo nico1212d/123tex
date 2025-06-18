@@ -10,6 +10,7 @@ __pycache__/
 
 MaiBot/
 modules/
+runtime/
 # Distribution / packaging
 .Python
 build/
