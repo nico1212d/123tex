@@ -370,9 +370,12 @@ def start_maibot_learning():
         return False
 
 def show_menu():
-    print("\n=== MaiBot 控制菜单 ===")
-    print(" 麦麦控制台 ")
+    print("\n=== MaiBot 控制台 ===")
     print("制作By MaiBot Team @MotricSeven")
+    print("版本 4.0.0")
+    print("一键包附加脚本仓库：https://github.com/DrSmoothl/MaiBotOneKey")
+    print("麦麦MaiBot主仓库：https://github.com/MaiM-with-u/MaiBot")
+    print("如果可以的话，希望您可以给这两个仓库点个Star！")
     print("======================")
     print("1. 启动所有服务")
     print("2. 单独启动 NapCat")
