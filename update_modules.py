@@ -64,7 +64,7 @@ def install_requirements(repo_path, repo_name):
     
     # 获取Python可执行文件路径
     python_cmd = sys.executable    # 安装依赖（使用阿里云镜像源，禁用进度条避免编码问题）
-    install_cmd = f'"{python_cmd}" -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com --no-color --disable-pip-version-check --progress-bar off'
+    install_cmd = f'"{python_cmd}" -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com --upgrade --no-color --disable-pip-version-check --progress-bar off'
     success = run_command(install_cmd, repo_path, f"安装 {repo_name} 依赖")
     
     if success:
