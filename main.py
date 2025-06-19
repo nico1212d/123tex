@@ -66,6 +66,10 @@ if __name__ == "__main__":
             print("正在执行MaiBot初始化脚本...")
             print("======================")
             run_python_script("config_manager.py")
+            print("3秒后启动MaiBot Client...")
+            os.system("timeout /t 3 /nobreak > nul")
+            os.system("cls")
+            run_python_script("main.py")
         else:
             try:
                 print("检测到不是首次运行，正在跳过向导启动 MaiBot Core...")
