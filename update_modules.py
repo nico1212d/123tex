@@ -2,6 +2,14 @@
 """
 模块更新脚本
 功能：更新所有模块的git仓库并安装依赖包
+支持参数：
+- --only-onekey: 仅更新一键包仓库
+- 无参数: 更新所有模块
+
+特性：
+- 支持多个备用远程仓库，当一个仓库无法访问时自动尝试下一个
+- 在拉取前强制设置远程仓库为指定的仓库地址
+- 自动安装requirements.txt中的依赖包
 """
 
 import os
@@ -74,8 +82,8 @@ def install_requirements(repo_path, repo_name):
     
     return success
 
-def update_repository(repo_path, repo_name):
-    """更新单个仓库"""
+def update_repository(repo_path, repo_name, remote_urls=None):
+    """更新单个仓库，支持多个备用远程仓库"""
     print(f"\n{'='*50}")
     print(f"正在更新 {repo_name}")
     print(f"路径: {repo_path}")
@@ -88,6 +96,45 @@ def update_repository(repo_path, repo_name):
     if not os.path.exists(os.path.join(repo_path, '.git')):
         print(f"❌ 错误: 不是git仓库: {repo_path}")
         return False
+    
+    # 如果提供了远程URL列表，尝试每个URL直到成功
+    pull_success = False
+    if remote_urls:
+        # 确保remote_urls是列表
+        if isinstance(remote_urls, str):
+            remote_urls = [remote_urls]
+        
+        for i, remote_url in enumerate(remote_urls):
+            print(f"尝试远程仓库 {i+1}/{len(remote_urls)}: {remote_url}")
+            
+            # 设置远程仓库
+            if run_git_command(repo_path, f"git remote set-url origin {remote_url}"):
+                print(f"✅ 成功设置远程仓库: {remote_url}")
+                
+                # 尝试拉取
+                print("正在拉取最新代码...")
+                if run_git_command(repo_path, "git pull"):
+                    print(f"✅ {repo_name} 更新完成")
+                    pull_success = True
+                    break
+                else:
+                    print(f"❌ 从 {remote_url} 拉取失败，尝试下一个仓库")            
+            else:
+                print(f"❌ 设置远程仓库失败: {remote_url}")
+        
+        if not pull_success:
+            print(f"❌ 所有远程仓库都无法访问，{repo_name} 更新失败")
+            return False
+    else:
+        # 没有提供远程URL，直接使用现有的远程仓库
+        print("使用现有远程仓库进行更新")
+        print("正在拉取最新代码...")
+        if not run_git_command(repo_path, "git pull"):
+            print(f"❌ {repo_name} 更新失败")
+            return False
+        else:
+            print(f"✅ {repo_name} 更新完成")
+            pull_success = True
     
     # 检查git状态
     print("检查仓库状态...")
@@ -112,52 +159,84 @@ def update_repository(repo_path, repo_name):
         print("无法获取当前分支")
         current_branch = "main"
     
-    # 执行git pull
-    print("正在拉取最新代码...")
-    success = run_git_command(repo_path, "git pull")
-    
-    if success:
-        print(f"✅ {repo_name} 更新完成")
-    else:
-        print(f"❌ {repo_name} 更新失败")
-    
-    return success
+    return pull_success
 
 def main():
     """主函数"""
-    print("开始更新所有模块...")
+    # 检查命令行参数
+    only_onekey = len(sys.argv) > 1 and sys.argv[1] == "--only-onekey"
+    
+    if only_onekey:
+        print("开始更新一键包仓库...")
+    else:
+        print("开始更新所有模块...")
+    
     print(f"当前工作目录: {os.getcwd()}")
     
     # 获取脚本所在目录（项目根目录）
     script_dir = Path(__file__).parent.absolute()
-    
-    # 定义要更新的仓库
-    repositories = [
-        {
-            'name': '一键包主仓库',
-            'path': script_dir
-        },
-        {
-            'name': 'MaiBot主仓库',
-            'path': script_dir / 'modules' / 'MaiBot'
-        },
-        {
-            'name': 'MaiBot-Napcat-Adapter适配器仓库',
-            'path': script_dir / 'modules' / 'MaiBot-Napcat-Adapter'
-        }
-    ]
+      # 硬编码的远程仓库URL（支持多个备用仓库）
+    REMOTE_URLS = {
+        'onekey': [
+            'https://gh.llkk.cc/https://github.com/DrSmoothl/MaiBotOneKey.git',
+            'https://github.moeyy.xyz/https://github.com/DrSmoothl/MaiBotOneKey.git',
+            'https://gitproxy.click/https://github.com/DrSmoothl/MaiBotOneKey.git',
+            'https://gitproxy.net/https://github.com/DrSmoothl/MaiBotOneKey.git',
+            'https://github.com/DrSmoothl/MaiBotOneKey.git'
+        ],
+        'maibot': [
+            'https://gh.llkk.cc/https://github.com/MaiM-with-u/MaiBot.git',
+            'https://github.moeyy.xyz/https://github.com/MaiM-with-u/MaiBot.git',
+            'https://gitproxy.click/https://github.com/MaiM-with-u/MaiBot.git',
+            'https://gitproxy.net/https://github.com/MaiM-with-u/MaiBot.git',
+            'https://github.com/MaiM-with-u/MaiBot.git',
+        ],
+        'adapter': [
+            'https://gh.llkk.cc/https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git',
+            'https://github.moeyy.xyz/https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git',
+            'https://gitproxy.click/https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git',
+            'https://gitproxy.net/https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git',
+            'https://github.com/MaiM-with-u/MaiBot-Napcat-Adapter.git'
+        ]
+    }
+      # 定义要更新的仓库
+    if only_onekey:
+        repositories = [
+            {
+                'name': '一键包主仓库',
+                'path': script_dir,
+                'remote_urls': REMOTE_URLS['onekey']
+            }
+        ]
+    else:
+        repositories = [
+            {
+                'name': '一键包主仓库',
+                'path': script_dir,
+                'remote_urls': REMOTE_URLS['onekey']
+            },
+            {
+                'name': 'MaiBot主仓库',
+                'path': script_dir / 'modules' / 'MaiBot',
+                'remote_urls': REMOTE_URLS['maibot']
+            },
+            {
+                'name': 'MaiBot-Napcat-Adapter适配器仓库',
+                'path': script_dir / 'modules' / 'MaiBot-Napcat-Adapter',
+                'remote_urls': REMOTE_URLS['adapter']
+            }
+        ]
     
     total_count = len(repositories)
     update_success_count = 0
     install_success_count = 0
-    
-    # 第一阶段：逐个更新仓库
+      # 第一阶段：逐个更新仓库
     print(f"\n{'='*60}")
     print("第一阶段：更新Git仓库")
     print(f"{'='*60}")
     
     for repo in repositories:
-        if update_repository(str(repo['path']), repo['name']):
+        if update_repository(str(repo['path']), repo['name'], repo['remote_urls']):
             update_success_count += 1
     
     # 第二阶段：安装依赖
@@ -171,12 +250,18 @@ def main():
     
     # 输出总结
     print(f"\n{'='*60}")
-    print(f"更新完成！Git更新: {update_success_count}/{total_count}")
+    if only_onekey:
+        print(f"一键包仓库更新完成！Git更新: {update_success_count}/{total_count}")
+    else:
+        print(f"更新完成！Git更新: {update_success_count}/{total_count}")
     print(f"依赖安装: {install_success_count}/{total_count}")
     print(f"{'='*60}")
     
     if update_success_count == total_count and install_success_count == total_count:
-        print("🎉 所有模块更新和依赖安装成功！")
+        if only_onekey:
+            print("🎉 一键包仓库更新和依赖安装成功！")
+        else:
+            print("🎉 所有模块更新和依赖安装成功！")
         return 0
     elif update_success_count == total_count:
         print("✅ 所有模块更新成功，但部分依赖安装失败")
@@ -184,6 +269,11 @@ def main():
     else:
         print("⚠️  部分模块更新失败，请检查错误信息")
         return 1
+
+def update_onekey_only():
+    """仅更新一键包仓库的便捷函数"""
+    sys.argv = [sys.argv[0], "--only-onekey"]  # 设置参数
+    return main()
 
 if __name__ == "__main__":
     try:
