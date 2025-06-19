@@ -17,6 +17,42 @@ import subprocess
 import sys
 from pathlib import Path
 
+def get_git_command():
+    """获取可用的git命令路径"""
+    # 获取脚本所在目录（项目根目录）
+    script_dir = Path(__file__).parent.absolute()
+    
+    # 检查内置git
+    portable_git = script_dir / 'runtime' / 'PortableGit' / 'bin' / 'git.exe'
+    
+    if portable_git.exists():
+        print(f"✅ 找到内置Git: {portable_git}")
+        return str(portable_git)
+    
+    # 检查系统git
+    try:
+        result = subprocess.run(
+            ['git', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            print(f"✅ 找到系统Git: git")
+            return 'git'
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    
+    # 都没找到
+    print("❌ 错误: 未找到Git命令！")
+    print("请确保满足以下条件之一：")
+    print(f"  1. 内置Git存在: {portable_git}")
+    print("  2. 系统已安装Git并添加到PATH环境变量")
+    return None
+
+# 全局变量存储git命令
+GIT_COMMAND = None
+
 def run_command(command, cwd=None, description=""):
     """执行命令"""
     try:
@@ -56,7 +92,21 @@ def run_command(command, cwd=None, description=""):
 
 def run_git_command(repo_path, command):
     """在指定目录执行git命令"""
-    return run_command(command, repo_path)
+    global GIT_COMMAND
+    
+    # 如果还没有检测git命令，先检测
+    if GIT_COMMAND is None:
+        GIT_COMMAND = get_git_command()
+        if GIT_COMMAND is None:
+            return False
+    
+    # 替换命令中的git为具体的git路径
+    if command.startswith('git '):
+        git_command = command.replace('git ', f'"{GIT_COMMAND}" ', 1)
+    else:
+        git_command = command
+    
+    return run_command(git_command, repo_path)
 
 def install_requirements(repo_path, repo_name):
     """安装requirements.txt中的依赖"""
@@ -173,9 +223,18 @@ def main():
     
     print(f"当前工作目录: {os.getcwd()}")
     
+    # 初始化Git检测
+    global GIT_COMMAND
+    print("\n正在检测Git环境...")
+    GIT_COMMAND = get_git_command()
+    if GIT_COMMAND is None:
+        print("❌ Git环境检测失败，无法继续")
+        return 1
+    
     # 获取脚本所在目录（项目根目录）
     script_dir = Path(__file__).parent.absolute()
-      # 硬编码的远程仓库URL（支持多个备用仓库）
+    
+    # 硬编码的远程仓库URL（支持多个备用仓库）
     REMOTE_URLS = {
         'onekey': [
             'https://gh.llkk.cc/https://github.com/DrSmoothl/MaiBotOneKey.git',
