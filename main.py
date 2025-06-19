@@ -68,7 +68,7 @@ if __name__ == "__main__":
             run_python_script("config_manager.py")
         else:
             try:
-                print("正在启动 MaiBot Core...")
+                print("检测到不是首次运行，正在跳过向导启动 MaiBot Core...")
                 run_python_script("start.py")
             except Exception as e:
                 print(f"启动主程序出错：{str(e)}")
