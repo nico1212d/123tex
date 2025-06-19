@@ -10,7 +10,7 @@ echo 正在启动一键包仓库更新...
 echo.
 
 rem 使用内置Python运行更新脚本，只更新一键包仓库
-"runtime\python31211\python.exe" update_modules.py --only-onekey
+"runtime\python31211\bin\python.exe" update_modules.py --only-onekey
 
 echo.
 echo ========================================
