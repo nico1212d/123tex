@@ -11,6 +11,7 @@ __pycache__/
 MaiBot/
 modules/
 runtime/
+logs/
 # Distribution / packaging
 .Python
 build/
