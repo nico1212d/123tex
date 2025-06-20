@@ -220,6 +220,68 @@ def launch_config_manager():
     config_path = os.path.dirname(os.path.abspath(__file__))
     return create_cmd_window(config_path, 'python config_manager.py')
 
+def interactive_pip_install():
+    """交互式安装pip模块"""
+    print("\n=== 交互式安装pip模块 ===")
+    print("1. 通过模块名称安装")
+    print("2. 通过requirements.txt文件安装")
+    print("0. 返回主菜单")
+    
+    while True:
+        choice = input("请选择安装模式 (1/2/0): ").strip()
+        
+        if choice == '0':
+            logger.info("已取消pip模块安装，返回主菜单")
+            return True
+            
+        elif choice == '1':
+            # 模块名称安装模式
+            modules = input("请输入要安装的模块名称（多个模块用空格分隔）: ").strip()
+            if not modules:
+                logger.error("模块名称不能为空")
+                continue
+            
+            # 使用内置的python路径和阿里云镜像源
+            python_path = get_absolute_path('runtime/python31211/bin/python.exe')
+            command = f'"{python_path}" -m pip install -i https://mirrors.aliyun.com/pypi/simple/ {modules}'
+            
+            logger.info(f"正在安装模块: {modules}")
+            logger.info("使用阿里云镜像源加速下载...")
+            
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            return create_cmd_window(script_dir, command)
+            
+        elif choice == '2':
+            # requirements.txt安装模式
+            requirements_path = input("请输入requirements.txt文件的完整路径: ").strip()
+            
+            # 处理Windows路径（去除引号，标准化路径分隔符）
+            requirements_path = requirements_path.strip('"').strip("'")
+            requirements_path = os.path.normpath(requirements_path)
+            
+            if not os.path.exists(requirements_path):
+                logger.error(f"错误：找不到文件 {requirements_path}")
+                continue
+            
+            if not requirements_path.lower().endswith('.txt'):
+                logger.warning("警告：文件扩展名不是.txt，请确认这是requirements文件")
+                confirm = input("是否继续？(y/N): ").strip().lower()
+                if confirm != 'y':
+                    continue
+            
+            # 使用内置的python路径和阿里云镜像源
+            python_path = get_absolute_path('runtime/python31211/bin/python.exe')
+            command = f'"{python_path}" -m pip install -i https://mirrors.aliyun.com/pypi/simple/ -r "{requirements_path}"'
+            
+            logger.info(f"正在从requirements文件安装: {requirements_path}")
+            logger.info("使用阿里云镜像源加速下载...")
+            
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            return create_cmd_window(script_dir, command)
+            
+        else:
+            logger.error("无效选择，请输入 1、2 或 0")
+
 def launch_python_cmd():
     """启动一个使用项目 Python 环境的CMD窗口"""
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -385,7 +447,7 @@ def show_menu():
     print("6. 麦麦基础配置")
     print("7. 安装VC运行库")
     print("8. 启动可视化数据库管理")
-    print("9. 启动虚拟环境命令行")
+    print("9. 交互式安装pip模块")
     print("======================")
     print("数据管理功能：")
     print("10. 麦麦删除所有记忆（删库）")
@@ -472,9 +534,8 @@ def main():
                 install_vc_redist()            
             elif choice == '8':
                 logger.info("正在启动SQLiteStudio..." + ("成功" if launch_sqlite_studio() else "失败"))
-                
             elif choice == '9':
-                logger.info("正在启动 Python 命令行..." + ("成功" if launch_python_cmd() else "失败"))
+                logger.info("正在启动交互式pip模块安装..." + ("成功" if interactive_pip_install() else "失败"))
                 
             elif choice == '10':
                 logger.info("正在删除麦麦所有记忆..." + ("成功" if delete_maibot_memory() else "失败"))

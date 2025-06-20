@@ -7,7 +7,7 @@ try:
     from modules.MaiBot.src.common.logger import get_logger
     logger = get_logger("init")
 except ImportError:
-    import logger
+    import logging as logger
     logger.basicConfig(level=logger.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logger.getLogger("init")
 
