@@ -435,7 +435,7 @@ def start_maibot_learning():
 def get_hitokoto():
     """获取一言内容和作者，失败返回None"""
     try:
-        resp = requests.get('https://v1.hitokoto.cn/?encode=json', timeout=3)
+        resp = requests.get('https://hitokoto.tianmoy.cn/?encode=json', timeout=3)
         if resp.status_code == 200:
             data = resp.json()
             text = data.get('hitokoto', '').strip()
