@@ -132,8 +132,8 @@ def install_requirements(repo_path, repo_name):
     
     return success
 
-def update_repository(repo_path, repo_name, remote_urls=None):
-    """更新单个仓库，支持多个备用远程仓库"""
+def update_repository(repo_path, repo_name, remote_urls=None, force_reset=False):
+    """更新单个仓库，支持多个备用远程仓库，支持强制覆盖本地更改"""
     print(f"\n{'='*50}")
     print(f"正在更新 {repo_name}")
     print(f"路径: {repo_path}")
@@ -146,7 +146,26 @@ def update_repository(repo_path, repo_name, remote_urls=None):
     if not os.path.exists(os.path.join(repo_path, '.git')):
         print(f"❌ 错误: 不是git仓库: {repo_path}")
         return False
-    
+
+    # 如果需要强制覆盖本地更改，先执行 reset --hard 和 clean -fd
+    if force_reset:
+        print("⚠️  一键包将强制覆盖所有本地更改（包括未提交和已暂存的修改，配置文件和数据文件夹不在这个范围），此操作不可逆！")
+        confirm = input("是否继续？输入 y 确认，其他键取消: ").strip().lower()
+        if confirm != 'y':
+            print("用户取消强制更新操作。")
+            return False
+        print("\n正在放弃所有本地更改并强制拉取最新代码...")
+        if not run_git_command(repo_path, 'git reset --hard'):
+            print("❌ git reset --hard 失败")
+            return False
+        if not run_git_command(repo_path, 'git clean -fd'):
+            print("❌ git clean -fd 失败")
+            return False
+        if not run_git_command(repo_path, 'git fetch --all'):
+            print("❌ git fetch --all 失败")
+            return False
+        # 下面的 pull 会被 remote_urls 逻辑覆盖
+
     # 如果提供了远程URL列表，尝试每个URL直到成功
     pull_success = False
     if remote_urls:
@@ -163,12 +182,21 @@ def update_repository(repo_path, repo_name, remote_urls=None):
                 
                 # 尝试拉取
                 print("正在拉取最新代码...")
-                if run_git_command(repo_path, "git pull"):
-                    print(f"✅ {repo_name} 更新完成")
-                    pull_success = True
-                    break
+                if force_reset:
+                    # 强制拉取远程最新代码并覆盖本地
+                    if run_git_command(repo_path, 'git reset --hard origin/HEAD') or run_git_command(repo_path, 'git pull --rebase') or run_git_command(repo_path, 'git pull'):
+                        print(f"✅ {repo_name} 强制更新完成")
+                        pull_success = True
+                        break
+                    else:
+                        print("❌ 强制拉取失败，尝试下一个仓库")
                 else:
-                    print(f"❌ 从 {remote_url} 拉取失败，尝试下一个仓库")            
+                    if run_git_command(repo_path, "git pull"):
+                        print(f"✅ {repo_name} 更新完成")
+                        pull_success = True
+                        break
+                    else:
+                        print(f"❌ 从 {remote_url} 拉取失败，尝试下一个仓库")            
             else:
                 print(f"❌ 设置远程仓库失败: {remote_url}")
         
@@ -264,7 +292,8 @@ def main():
             {
                 'name': '一键包主仓库',
                 'path': script_dir,
-                'remote_urls': REMOTE_URLS['onekey']
+                'remote_urls': REMOTE_URLS['onekey'],
+                'force_reset': True
             }
         ]
     else:
@@ -272,17 +301,20 @@ def main():
             {
                 'name': '一键包主仓库',
                 'path': script_dir,
-                'remote_urls': REMOTE_URLS['onekey']
+                'remote_urls': REMOTE_URLS['onekey'],
+                'force_reset': True
             },
             {
                 'name': 'MaiBot主仓库',
                 'path': script_dir / 'modules' / 'MaiBot',
-                'remote_urls': REMOTE_URLS['maibot']
+                'remote_urls': REMOTE_URLS['maibot'],
+                'force_reset': False
             },
             {
                 'name': 'MaiBot-Napcat-Adapter适配器仓库',
                 'path': script_dir / 'modules' / 'MaiBot-Napcat-Adapter',
-                'remote_urls': REMOTE_URLS['adapter']
+                'remote_urls': REMOTE_URLS['adapter'],
+                'force_reset': False
             }
         ]
     
@@ -295,7 +327,7 @@ def main():
     print(f"{'='*60}")
     
     for repo in repositories:
-        if update_repository(str(repo['path']), repo['name'], repo['remote_urls']):
+        if update_repository(str(repo['path']), repo['name'], repo['remote_urls'], repo.get('force_reset', False)):
             update_success_count += 1
     
     # 第二阶段：安装依赖
