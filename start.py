@@ -207,7 +207,7 @@ def update_qq_in_config(config_path: str, qq_number: str):
         if 'bot' not in doc:
             doc['bot'] = tomlkit.table()  # 如果 bot 表不存在则创建
         
-        doc['bot']['qq'] = qq_number  # 直接赋值，tomlkit 会处理类型
+        doc['bot']['qq_account'] = qq_number  # 直接赋值，tomlkit 会处理类型
         
         with open(config_path, 'w', encoding='utf-8') as f:
             tomlkit.dump(doc, f)
