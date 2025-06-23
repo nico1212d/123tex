@@ -9,6 +9,7 @@ try:
     logger = get_logger("init")
 except ImportError:
     from loguru import logger
+import requests
 
 def get_absolute_path(relative_path):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -431,6 +432,20 @@ def start_maibot_learning():
         logger.error(f"错误：启动麦麦学习流程时出现异常：{str(e)}")
         return False
 
+def get_hitokoto():
+    """获取一言内容和作者，失败返回None"""
+    try:
+        resp = requests.get('https://v1.hitokoto.cn/?encode=json', timeout=3)
+        if resp.status_code == 200:
+            data = resp.json()
+            text = data.get('hitokoto', '').strip()
+            from_who = data.get('from_who') or data.get('from') or ''
+            from_who = from_who.strip()
+            return text, from_who
+    except Exception:
+        pass
+    return None, None
+
 def show_menu():
     print("\n=== MaiBot 控制台 ===")
     print("制作By MaiBot Team @MotricSeven")
@@ -438,6 +453,13 @@ def show_menu():
     print("一键包附加脚本仓库：https://github.com/DrSmoothl/MaiBotOneKey")
     print("麦麦MaiBot主仓库：https://github.com/MaiM-with-u/MaiBot")
     print("如果可以的话，希望您可以给这两个仓库点个Star！")
+    print("======================")
+    # 显示一言
+    text, from_who = get_hitokoto()
+    if text:
+        print(text)
+        if from_who:
+            print(f"——{from_who}")
     print("======================")
     print("1. 启动所有服务")
     print("2. 单独启动 NapCat")
