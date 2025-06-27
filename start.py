@@ -478,9 +478,47 @@ def show_menu():
     print("13. 导入其他人的OpenIE文件")
     print("14. 麦麦开始学习")
     print("======================")
+    print("其他功能：")
+    print("15. 快捷打开配置文件")
+    print("======================")
     print("0. 退出程序")
     print("======================")
     return input("请输入选项：").strip()
+
+def open_config_file():
+    """快捷打开配置文件"""
+    config_files = [
+        ("MaiBot主配置", get_absolute_path('modules/MaiBot/config/bot_config.toml')),
+        ("MaiBot-LPMM知识库配置", get_absolute_path('modules/MaiBot/config/lpmm_config.toml')),
+        ("MaiBot环境文件(.env)", get_absolute_path('modules/MaiBot/.env')),
+        ("NapCat适配器配置", get_absolute_path('modules/MaiBot-Napcat-Adapter/config.toml')),
+        # 可以继续添加更多配置文件
+    ]
+    print("\n=== 快捷打开配置文件 ===")
+    for idx, (name, _) in enumerate(config_files, 1):
+        print(f"{idx}. {name}")
+    print("0. 返回主菜单")
+    choice = input("请选择要打开的配置文件: ").strip()
+    if choice == '0':
+        return True
+    if not choice.isdigit() or not (1 <= int(choice) <= len(config_files)):
+        logger.error("无效选择")
+        return False
+    name, path = config_files[int(choice) - 1]
+    code_exe = get_absolute_path('modules/vscode/Code.exe')
+    if not os.path.exists(code_exe):
+        logger.error(f"找不到VSCode可执行文件 {code_exe}")
+        return False
+    if not os.path.exists(path):
+        logger.error(f"找不到配置文件 {path}")
+        return False
+    try:
+        subprocess.run([code_exe, path], check=True)
+        logger.info(f"{name} 已使用 VSCode 打开")
+        return True
+    except Exception as e:
+        logger.error(f"打开文件失败: {e}")
+        return False
 
 def main():
     try:
@@ -571,6 +609,8 @@ def main():
                 logger.info("正在启动OpenIE文件导入工具..." + ("成功" if import_openie_file() else "失败"))
             elif choice == '14':
                 logger.info("正在启动麦麦学习流程..." + ("成功" if start_maibot_learning() else "失败"))
+            elif choice == '15':
+                logger.info("正在打开配置文件..." + ("成功" if open_config_file() else "失败"))
 
             else:
                 logger.error("无效选项，请重新输入")
