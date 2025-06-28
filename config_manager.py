@@ -811,7 +811,7 @@ def main():
         print("=" * 60)
         print("所有配置已保存成功")
         print("现在可以启动 MaiBot 了")
-        print("如需更多配置，请编辑 config/bot_config.toml 文件")
+        print("更多配置请使用一键包控制台中的\"快捷打开配置文件\"功能")
         print("=" * 60)
         
     except KeyboardInterrupt:
