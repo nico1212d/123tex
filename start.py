@@ -1370,10 +1370,93 @@ def open_config_file() -> bool:
         return False
 
 
+def check_and_create_config_files() -> bool:
+    """检测并创建所有必要的配置文件
+    
+    Returns:
+        bool: 所有配置文件检测和创建是否成功
+    """
+    config_checks = [
+        {
+            'name': 'MaiBot配置目录',
+            'path': get_absolute_path('modules/MaiBot/config'),
+            'is_directory': True
+        },
+        {
+            'name': 'MaiBot主配置文件',
+            'path': get_absolute_path('modules/MaiBot/config/bot_config.toml'),  
+            'template': get_absolute_path('modules/MaiBot/template/bot_config_template.toml'),
+            'is_directory': False
+        },
+        {
+            'name': 'MaiBot-LPMM配置文件',
+            'path': get_absolute_path('modules/MaiBot/config/lpmm_config.toml'),
+            'template': get_absolute_path('modules/MaiBot/template/lpmm_config_template.toml'),
+            'is_directory': False
+        },
+        {
+            'name': 'MaiBot环境文件',
+            'path': get_absolute_path('modules/MaiBot/config/.env'),
+            'template': get_absolute_path('modules/MaiBot/template/template.env'),
+            'is_directory': False
+        },
+        {
+            'name': 'NapCat适配器配置文件',
+            'path': get_absolute_path('modules/MaiBot-Napcat-Adapter/config.toml'),
+            'template': get_absolute_path('modules/MaiBot-Napcat-Adapter/template.toml'),
+            'is_directory': False
+        }
+    ]
+    
+    all_success = True
+    
+    for config in config_checks:
+        try:
+            if config['is_directory']:
+                # 检测目录
+                if not os.path.exists(config['path']):
+                    os.makedirs(config['path'], exist_ok=True)
+                    logger.info(f"已创建目录: {config['name']}")
+                else:
+                    logger.info(f"目录已存在: {config['name']}")
+            else:
+                # 检测配置文件
+                if not os.path.exists(config['path']):
+                    if 'template' in config and os.path.exists(config['template']):
+                        # 确保目标目录存在
+                        target_dir = os.path.dirname(config['path'])
+                        if not os.path.exists(target_dir):
+                            os.makedirs(target_dir, exist_ok=True)
+                        
+                        # 复制模板文件
+                        shutil.copy2(config['template'], config['path'])
+                        logger.info(f"已从模板创建配置文件: {config['name']}")
+                    else:
+                        logger.warning(f"模板文件不存在，无法创建: {config['name']}")
+                        logger.warning(f"模板路径: {config.get('template', '未指定')}")
+                        all_success = False
+                else:
+                    logger.info(f"配置文件已存在: {config['name']}")
+                    
+        except Exception as e:
+            logger.error(f"处理配置文件时出错 {config['name']}: {str(e)}")
+            all_success = False
+    
+    if all_success:
+        logger.info("所有配置文件检测完成！")
+    else:
+        logger.warning("部分配置文件处理失败，请检查上述错误信息")
+    
+    return all_success
+
+
 def main() -> None:
     """主程序入口"""
     # 初始化菜单系统
     initialize_menu()
+    
+    # 检测并创建配置文件
+    check_and_create_config_files()
     
     try:
         while True:
