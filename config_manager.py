@@ -1,888 +1,826 @@
 import os
 import shutil
-import tomlkit  # 替换 tomli 和 tomli_w
+import tomlkit
 from dotenv import dotenv_values
-try:
-    from modules.MaiBot.src.common.logger import get_logger  # 确保路径正确
-    logger = get_logger("init")
-except ImportError:
-    from loguru import logger
 
+try:
+    from modules.MaiBot.src.common.logger import get_logger
+    logger = get_logger("config_manager")
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger("config_manager")
+
+# 配置文件路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot", "config", "bot_config.toml")
-BACKUP_PATH = CONFIG_PATH + ".bak"
+BACKUP_PATH = f"{CONFIG_PATH}.bak"
 LPMM_CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot", "config", "lpmm_config.toml")
-LPMM_BACKUP_PATH = LPMM_CONFIG_PATH + ".bak"
+NAPCAT_CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot-Napcat-Adapter", "config.toml")
+
+def print_welcome():
+    """显示欢迎信息"""
+    print("=" * 60)
+    print("欢迎使用 MaiBot 新手配置向导！（新版本适配）")
+    print("=" * 60)
+    print("本向导专为新手小白设计，8步即可完成新版本配置")
+    print("提示：直接回车使用默认值，输入 Ctrl+C 退出")
+    print("更多配置请使用一键包控制台中的\"快捷打开配置文件\"功能")
+    print("=" * 60)
+    print()
+
+def get_yes_no_input(prompt, default=False):
+    """获取是/否输入"""
+    default_text = "是" if default else "否"
+    user_input = input(f"{prompt} [是/否]（默认：{default_text}）：").strip().lower()
+    
+    if user_input in ['y', 'yes', '是', '1', 'true']:
+        return True
+    elif user_input in ['n', 'no', '否', '0', 'false']:
+        return False
+    else:
+        return default
+
+def get_number_input(prompt, default, min_val=None, max_val=None):
+    """获取数字输入"""
+    while True:
+        user_input = input(f"{prompt}（默认：{default}）：").strip()
+        
+        if not user_input:
+            return default
+            
+        try:
+            value = float(user_input)
+            if min_val is not None and value < min_val:
+                print(f"输入值不能小于 {min_val}")
+                continue
+            if max_val is not None and value > max_val:
+                print(f"输入值不能大于 {max_val}")
+                continue
+            return int(value) if value.is_integer() else value
+        except ValueError:
+            print("请输入有效的数字")
+
+def get_text_input(prompt, default="", required=False):
+    """获取文本输入"""
+    while True:
+        user_input = input(f"{prompt}（当前：{default}）：").strip()
+        
+        if not user_input:
+            if required and not default:
+                print("此项为必填项，请输入内容")
+                continue
+            return default or ""
+        
+        return user_input
 
 def backup_config():
+    """备份配置文件"""
     try:
-        if not os.path.exists(BACKUP_PATH) and os.path.exists(CONFIG_PATH):
+        if os.path.exists(CONFIG_PATH) and not os.path.exists(BACKUP_PATH):
             os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
             shutil.copy(CONFIG_PATH, BACKUP_PATH)
             logger.info(f"已创建配置文件备份：{BACKUP_PATH}")
         else:
-            logger.info("主配置备份文件已存在，跳过备份")
-        # 新增lpmm_config.toml的备份
-        if os.path.exists(LPMM_CONFIG_PATH) and not os.path.exists(LPMM_BACKUP_PATH):
-            os.makedirs(os.path.dirname(LPMM_CONFIG_PATH), exist_ok=True)
-            shutil.copy(LPMM_CONFIG_PATH, LPMM_BACKUP_PATH)
-            logger.info(f"已创建lpmm配置文件备份：{LPMM_BACKUP_PATH}")
-        elif os.path.exists(LPMM_BACKUP_PATH):
-            logger.info("lpmm配置备份文件已存在，跳过备份")
+            logger.info("配置备份文件已存在，跳过备份")
     except Exception as e:
         logger.error(f"备份失败: {str(e)}")
         raise
 
 def load_config():
+    """加载配置文件"""
     try:
         if not os.path.exists(CONFIG_PATH):
             # 尝试从模板创建配置文件
             template_path = os.path.join(BASE_DIR, "modules", "MaiBot", "template", "bot_config_template.toml")
             if os.path.exists(template_path):
                 config_dir = os.path.dirname(CONFIG_PATH)
-                if not os.path.exists(config_dir):
-                    os.makedirs(config_dir)
+                os.makedirs(config_dir, exist_ok=True)
                 shutil.copy2(template_path, CONFIG_PATH)
                 logger.info(f"已从模板创建配置文件: {CONFIG_PATH}")
             else:
-                logger.error(f"错误：找不到配置文件和模板文件 {CONFIG_PATH}")
+                logger.error(f"找不到配置文件和模板文件 {CONFIG_PATH}")
                 raise FileNotFoundError(f"配置文件 {CONFIG_PATH} 未找到")
         
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            user_config = tomlkit.load(f)
-            return user_config
+            return tomlkit.load(f)
+            
     except tomlkit.exceptions.TOMLKitError as e:
-        error_message = str(e)
-        error_message_zh = f"配置文件解析失败: {error_message}"  # 默认错误信息
-
-        line_num, col_num = None, None
-        # 尝试从错误信息中提取行列号
-        if " at line " in error_message and " col " in error_message:
-            try:
-                loc_part = error_message.split(" at line ")[-1]
-                parts = loc_part.strip().split(" col ")
-                line_num = parts[0].strip()
-                if len(parts) > 1:
-                    col_num = parts[1].strip().split()[0]  # 获取列号，忽略后续可能的文本
-            except IndexError:
-                pass # 解析行列号失败，保持为 None
-
-        # 根据具体的错误类型生成汉化信息
-        if "Unexpected character" in error_message and line_num and col_num:
-            char_info = "未知"
-            try:
-                char_info = error_message.split("'")[1]
-            except IndexError:
-                pass
-            error_message_zh = f"配置文件语法错误：在第 {line_num} 行，第 {col_num} 列遇到了意外的字符 '{char_info}'。"
-        elif "Unclosed string" in error_message and line_num and col_num:
-            error_message_zh = f"配置文件语法错误：在第 {line_num} 行，第 {col_num} 列存在未闭合的字符串。"
-        elif "Expected a key" in error_message and line_num and col_num:
-            error_message_zh = f"配置文件语法错误：在第 {line_num} 行，第 {col_num} 列期望一个键（key）。"
-        elif "Duplicate key" in error_message: # 此错误类型通常不直接包含行列号
-            key_name = "未知"
-            try:
-                key_name = error_message.split("'")[1]
-            except IndexError:
-                pass
-            error_message_zh = f"配置文件错误：存在重复的键 '{key_name}'。"
-            if line_num and col_num: # 如果错误信息中碰巧有行列号
-                error_message_zh += f" (大致位置在第 {line_num} 行，第 {col_num} 列附近)"
-        elif "Invalid escape sequence" in error_message and line_num and col_num:
-            error_message_zh = f"配置文件语法错误：在第 {line_num} 行，第 {col_num} 列存在无效的转义序列。"
-        elif "Expected newline or end of file" in error_message and line_num and col_num:
-            error_message_zh = f"配置文件语法错误：在第 {line_num} 行，第 {col_num} 列处，期望换行或文件结束。"
-        
-        logger.error(error_message_zh)
-        raise Exception(error_message_zh) # 抛出汉化后的异常信息 #noqa
+        logger.error(f"配置文件格式错误: {str(e)}")
+        raise Exception(f"配置文件格式错误，请检查文件语法：{str(e)}")
     except Exception as e:
         logger.error(f"读取配置失败: {str(e)}")
         raise
 
 def save_config(config):
+    """保存配置文件"""
     try:
         os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-        with open(CONFIG_PATH, "w", encoding="utf-8") as f:  # 修改打开模式和编码
-            tomlkit.dump(config, f)  # 使用 tomlkit.dump
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            tomlkit.dump(config, f)
         logger.info("配置文件已保存")
     except Exception as e:
         logger.error(f"保存配置失败: {str(e)}")
         raise
 
-def step_bot(config):
-    print("\n=== 配置昵称 ===")
-    try:
-        nickname = input(f"请输入机器人的昵称（当前：{config['bot']['nickname']}）：").strip()
-        if nickname.replace(" ", "") != "":
-            config['bot']['nickname'] = nickname
-    except Exception as e:
-        logger.error(f"昵称配置异常: {str(e)}")
-    return config
+def ensure_lpmm_config_exists():
+    """确保LPMM配置文件存在"""
+    if not os.path.exists(LPMM_CONFIG_PATH):
+        template_path = os.path.join(BASE_DIR, "modules", "MaiBot", "template", "lpmm_config_template.toml")
+        config_dir = os.path.dirname(LPMM_CONFIG_PATH)
+        os.makedirs(config_dir, exist_ok=True)
+        
+        if os.path.exists(template_path):
+            shutil.copy2(template_path, LPMM_CONFIG_PATH)
+            logger.info(f"已从模板创建LPMM配置文件: {LPMM_CONFIG_PATH}")
+        else:
+            # 创建基本配置文件
+            basic_config = tomlkit.document()
+            basic_config["info_extraction"] = {"workers": 10}
+            basic_config["llm_providers"] = []
+            with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
+                tomlkit.dump(basic_config, f)
+            logger.info(f"已创建基本LPMM配置文件: {LPMM_CONFIG_PATH}")
 
-def step_groups(config):
-    print("\n=== 配置可发消息群聊 ===")
-    groups = []
-    while True:
+def step_basic_info(config):
+    """配置基本信息"""
+    print("\n=== 第1步：配置机器人基本信息 ===")
+    
+    # 配置QQ账号和昵称
+    bot_config = config.setdefault('bot', {})
+    
+    # QQ账号配置
+    current_qq = bot_config.get('qq_account', '')
+    if current_qq:
+        print(f"当前QQ账号：{current_qq}")
+        if not get_yes_no_input("是否更换QQ账号", False):
+            pass
+        else:
+            qq_account = get_text_input("请输入机器人的QQ账号", str(current_qq), required=True)
+            try:
+                bot_config['qq_account'] = int(qq_account)
+            except ValueError:
+                print("QQ账号必须是数字，使用默认值")
+                bot_config['qq_account'] = current_qq or 1145141919810
+    else:
+        qq_account = get_text_input("请输入机器人的QQ账号", "1145141919810", required=True)
         try:
-            group = input(f"请输入第{len(groups)+1}个群号（留空结束）：").strip()
-            if not group or group.isspace():
-                break
-            if group.isdigit():
-                groups.append(int(group))
-            else:
-                logger.warning("错误：请输入有效的数字群号！")
+            bot_config['qq_account'] = int(qq_account)
         except ValueError:
-            logger.warning("错误：无效的数字格式！")
-        except KeyboardInterrupt:
-            print("\n输入已取消")
-            break
-        except Exception as e:
-            logger.error(f"群聊配置异常: {str(e)}")
-            break
-    if groups:
-        # 仅更新MaiBot-Napcat-Adapter的配置
-        try:
-            napcat_config_path = os.path.join(BASE_DIR, "modules", "MaiBot-Napcat-Adapter", "config.toml")
-            if os.path.exists(napcat_config_path):
-                with open(napcat_config_path, "r", encoding="utf-8") as f:
-                    napcat_config = tomlkit.load(f)
-                
-                # 更新群组列表
-                if 'Chat' not in napcat_config:
-                    napcat_config['Chat'] = {}
-                napcat_config['Chat']['group_list'] = groups
-                
-                with open(napcat_config_path, "w", encoding="utf-8") as f:
-                    tomlkit.dump(napcat_config, f)
-                logger.info("已配置群组到MaiBot-Napcat-Adapter")
-            else:
-                logger.warning(f"未找到MaiBot-Napcat-Adapter配置文件: {napcat_config_path}")
-        except Exception as e:
-            logger.error(f"配置MaiBot-Napcat-Adapter失败: {str(e)}")
+            print("QQ账号必须是数字，使用默认值")
+            bot_config['qq_account'] = 1145141919810
+    
+    # 昵称配置
+    current_nickname = bot_config.get('nickname', '麦麦')
+    nickname = get_text_input("请输入机器人的昵称", current_nickname)
+    bot_config['nickname'] = nickname
+    
+    # 别名配置
+    if get_yes_no_input("是否配置机器人别名", True):
+        current_aliases = bot_config.get('alias_names', ["麦叠", "牢麦"])
+        bot_config['alias_names'] = get_list_input(
+            "配置机器人别名（用户可以用这些名字称呼机器人）",
+            current_aliases,
+            "别名",
+            allow_empty=False
+        )
+    else:
+        bot_config['alias_names'] = bot_config.get('alias_names', ["麦叠", "牢麦"])
+    
+    print(f"机器人信息已设置：{nickname} (QQ: {bot_config['qq_account']})")
+    print(f"   别名: {', '.join(bot_config['alias_names'])}")
     return config
 
 def step_personality(config):
-    print("\n=== 配置人格 ===")
-    try:
-        personality = config.get('personality', {})
-        
-        # 配置主人格描述
-        current_core = personality.get('personality_core', '是一个积极向上的女大学生')
-        core = input(f"请输入主人格描述（建议200字以内，当前：{current_core}）：").strip()
-        if core:
-            personality['personality_core'] = core
-        else:
-            personality['personality_core'] = current_core
-            
-        print("\n--- 配置人格细节 ---")
-        print("请输入人格的详细描述，每条用一句话或几句话描述人格的一些细节")
-        
-        # 显示当前的人格细节
-        current_sides = personality.get('personality_sides', [])
-        if current_sides:
-            print("当前人格细节：")
-            for i, side in enumerate(current_sides, 1):
-                print(f"  {i}. {side}")
-        
-        # 询问是否重新配置
-        choice = input("是否重新配置人格细节？[是/否]（默认：否）：").strip().lower()
-        if choice in ['y', 'yes', '是']:
-            sides = []
-            while True:
-                try:
-                    side = input(f"请输入第{len(sides)+1}条人格细节（留空结束）：").strip()
-                    if not side or side.isspace():
-                        break
-                    sides.append(side)
-                except KeyboardInterrupt:
-                    print("\n输入已取消")
-                    break
-                except Exception as e:
-                    logger.error(f"人格细节配置异常: {str(e)}")
-                    break
-            
-            if sides:
-                personality['personality_sides'] = sides
-            else:
-                logger.warning("未输入任何人格细节，保持原有配置")
-        else:
-            # 保持原有配置
-            if not current_sides:
-                personality['personality_sides'] = [
-                    "用一句话或几句话描述人格的一些细节",
-                    "用一句话或几句话描述人格的一些细节",
-                    "用一句话或几句话描述人格的一些细节",
-                ]
-        
-        config['personality'] = personality
-    except Exception as e:
-        logger.error(f"人格配置异常: {str(e)}")
+    """配置人格设定"""
+    print("\n=== 第2步：配置机器人人格 ===")
+    print("提示：这决定了机器人的说话风格和性格特点")
+    
+    personality = config.setdefault('personality', {})
+    
+    # 主人格描述
+    current_core = personality.get('personality_core', '是一个积极向上的女大学生')
+    core = get_text_input("请输入机器人的基本人格描述（建议50字以内）", current_core)
+    personality['personality_core'] = core
+    
+    # 人格细节配置
+    if get_yes_no_input("是否配置详细的人格特点", False):
+        current_sides = personality.get('personality_sides', [
+            "友善热情，乐于助人",
+            "说话风格轻松自然",
+            "有一定的幽默感"
+        ])
+        personality['personality_sides'] = get_list_input(
+            "配置人格特点（描述机器人性格的各个方面）",
+            current_sides,
+            "人格特点",
+            allow_empty=False
+        )
+    else:
+        personality['personality_sides'] = personality.get('personality_sides', [
+            "友善热情，乐于助人",
+            "说话风格轻松自然",
+            "有一定的幽默感"
+        ])
+    
+    # 人格压缩设置
+    personality['compress_personality'] = get_yes_no_input("是否压缩人格信息（节省token，但会丢失细节）", False)
+    
+    config['personality'] = personality
+    print(f"机器人人格已设置：{core}")
     return config
 
 def step_identity(config):
-    print("\n=== 配置身份特征 ===")
-    print("请输入身份特征，可以描述外貌、性别、身高、职业、属性等等")
-    try:
-        identity = config.get('identity', {})
-        
-        # 显示当前的身份特征
-        current_details = identity.get('identity_detail', [])
-        if current_details:
-            print("当前身份特征：")
-            for i, detail in enumerate(current_details, 1):
-                print(f"  {i}. {detail}")
-        
-        # 询问是否重新配置
-        choice = input("是否重新配置身份特征？[是/否]（默认：否）：").strip().lower()
-        if choice in ['y', 'yes', '是']:
-            details = []
-            while True:
-                try:
-                    detail = input(f"请输入第{len(details)+1}条身份特征（留空结束）：").strip()
-                    if not detail or detail.isspace():
-                        break
-                    details.append(detail)
-                except KeyboardInterrupt:
-                    print("\n输入已取消")
-                    break
-                except Exception as e:
-                    logger.error(f"身份特征配置异常: {str(e)}")
-                    break
-            
-            if details:
-                identity['identity_detail'] = details
-            else:
-                logger.warning("未输入任何身份特征，保持原有配置")
-        else:
-            # 保持原有配置
-            if not current_details:
-                identity['identity_detail'] = [
-                    "年龄为19岁",
-                    "是女孩子", 
-                    "身高为160cm",
-                    "有橙色的短发",
-                ]
-        
-        config['identity'] = identity
-    except Exception as e:
-        logger.error(f"身份特征配置异常: {str(e)}")
+    """配置身份特征"""
+    print("\n=== 第3步：配置机器人身份特征 ===")
+    print("提示：包括外貌、性别、身高、职业等详细信息")
+    
+    identity = config.setdefault('identity', {})
+    
+    # 身份特征配置（根据新版本配置文件，这应该是一个列表）
+    if get_yes_no_input("是否配置详细的身份特征", True):
+        current_details = identity.get('identity_detail', [
+            "年龄为19岁",
+            "是女孩子", 
+            "身高为160cm",
+            "有橙色的短发"
+        ])
+        identity['identity_detail'] = get_list_input(
+            "配置身份特征（描述机器人的外貌、属性等）",
+            current_details,
+            "身份特征",
+            allow_empty=False
+        )
+    else:
+        identity['identity_detail'] = identity.get('identity_detail', [
+            "年龄为19岁",
+            "是女孩子",
+            "身高为160cm", 
+            "有橙色的短发"
+        ])
+    
+    # 身份压缩设置
+    identity['compress_indentity'] = get_yes_no_input("是否压缩身份信息（节省token，推荐开启）", True)
+    
+    config['identity'] = identity
+    print("身份特征已设置")
     return config
 
 def step_expression(config):
-    print("\n=== 配置语言风格 ===")
-    try:
-        # 配置表达方式
-        expression = config.get('expression', {})
-        
-        print("\n--- 配置表达风格 ---")
-        current_style = expression.get('expression_style', '描述麦麦说话的表达风格，表达习惯，例如：(回复尽量简短一些。可以参考贴吧，知乎和微博的回复风格，回复不要浮夸，不要用夸张修辞，平淡一些。不要有额外的符号，尽量简单简短)')
-        style = input(f"请输入表达风格描述（当前：{current_style}）：").strip()
-        if style:
-            expression['expression_style'] = style
-        else:
-            expression['expression_style'] = current_style
-            enable_learning = input(f"是否启用表达学习？[是/否]（当前：{'是' if expression.get('enable_expression_learning', False) else '否'}）：").strip().lower()
-        if enable_learning in ['y', 'yes', '是']:
-            expression['enable_expression_learning'] = True
-            # 只有启用表达学习时才配置学习间隔
-            interval = input(f"学习间隔（秒，当前：{expression.get('learning_interval', 600)}）：").strip()
-            if interval.isdigit():
-                expression['learning_interval'] = int(interval)
-            elif interval:
-                logger.warning("输入非法，已使用默认值。")
-                expression['learning_interval'] = 600
-            else:
-                expression['learning_interval'] = expression.get('learning_interval', 600)
-        elif enable_learning in ['n', 'no', '否']:
-            expression['enable_expression_learning'] = False
-        elif enable_learning:
-            logger.warning("输入非法，已使用默认值。")
-            
-        config['expression'] = expression
-        
-        # 配置关系设置
-        relationship = config.get('relationship', {})
-        
-        print("\n--- 配置关系设置 ---")
-        give_name = input(f"麦麦是否给其他人取名？[是/否]（当前：{'是' if relationship.get('give_name', True) else '否'}）：").strip().lower()
-        if give_name in ['y', 'yes', '是']:
-            relationship['give_name'] = True
-        elif give_name in ['n', 'no', '否']:
-            relationship['give_name'] = False
-        elif give_name:
-            logger.warning("输入非法，已使用默认值。")
-            
-        config['relationship'] = relationship
-        
-    except Exception as e:
-        logger.error(f"语言风格配置异常: {str(e)}")
+    """配置表达方式"""
+    print("\n=== 第4步：配置表达方式 ===")
+    print("提示：控制机器人的表达风格和学习能力")
+    
+    expression = config.setdefault('expression', {})
+    
+    # 表达学习功能
+    print("表达学习设置：")
+    expression['learn_expression'] = get_yes_no_input("启用表达学习（机器人会学习用户的表达方式）", True)
+    
+    if expression['learn_expression']:
+        expression['expression_window'] = get_number_input("表达学习窗口大小", 10, 5, 50)
+        expression['max_expression_count'] = get_number_input("最大学习表达数量", 30, 10, 100)
+        expression['learn_expression_threshold'] = get_number_input("学习阈值（0-1，越高学习越保守）", 0.7, 0.1, 1.0)
+    
+    config['expression'] = expression
+    print("表达方式配置完成")
     return config
 
-def step_response(config):
-    print("\n=== 配置聊天模式 ===")
+def step_chat_mode(config):
+    """配置聊天模式"""
+    print("\n=== 第5步：配置聊天模式 ===")
     print("聊天模式说明：")
-    print("1. normal（普通模式）：针对感兴趣的消息进行回复，token消耗量较低")
-    print("2. focus（专注模式）：进行主动的观察和回复，token消耗量较高")
-    print("3. auto（自动模式）：根据消息内容自动切换模式")
-    try:
-        chat = config.get('chat', {})
+    print("   • normal（普通模式）：适中的回复频率，推荐新手使用")
+    print("   • focus（专注模式）：更频繁的回复，消耗更多token")
+    print("   • auto（自动模式）：智能切换，需要一定经验")
+    
+    # 基础聊天配置
+    chat = config.setdefault('chat', {})
+    
+    while True:
+        mode = input("请选择聊天模式 [normal/focus/auto]（默认：normal）：").strip().lower() or 'normal'
         
-        # 配置聊天模式
-        current_mode = chat.get('chat_mode', 'normal')
-        mode = input(f"请选择聊天模式（normal/focus/auto，当前：{current_mode}）：").strip()
         if mode in ['normal', 'focus', 'auto']:
             chat['chat_mode'] = mode
-        elif mode:
-            logger.warning("输入非法，已使用默认值。")
+            break
         else:
-            chat['chat_mode'] = current_mode
-            
-        # 如果选择了auto模式，配置阈值
-        if chat.get('chat_mode') == 'auto':
-            print("\n--- 配置自动切换阈值 ---")
-            
-            # 自动进入专注模式阈值
-            current_auto_focus = chat.get('auto_focus_threshold', 1)
-            auto_focus = input(f"自动切换到专注聊天的阈值（越低越容易进入，当前：{current_auto_focus}）：").strip()
-            if auto_focus:
-                try:
-                    chat['auto_focus_threshold'] = float(auto_focus)
-                except ValueError:
-                    logger.warning("输入非法，已使用默认值。")
-                    chat['auto_focus_threshold'] = current_auto_focus
-            else:
-                chat['auto_focus_threshold'] = current_auto_focus
+            print("请输入有效的模式：normal、focus 或 auto")
+    
+    # 时段回复频率设置（新功能）
+    print("\n配置时段回复频率（不同时间段的活跃程度）：")
+    time_based = get_yes_no_input("是否配置不同时段的回复频率", False)
+    
+    if time_based:
+        # 简化时段配置
+        morning_freq = get_number_input("早晨活跃度（6:00-12:00）", 0.8, 0.1, 2.0)
+        afternoon_freq = get_number_input("下午活跃度（12:00-18:00）", 1.0, 0.1, 2.0)
+        evening_freq = get_number_input("晚上活跃度（18:00-24:00）", 1.2, 0.1, 2.0)
+        night_freq = get_number_input("深夜活跃度（0:00-6:00）", 0.3, 0.1, 2.0)
+        
+        chat['time_frequency'] = {
+            "6-12": morning_freq,
+            "12-18": afternoon_freq, 
+            "18-24": evening_freq,
+            "0-6": night_freq
+        }
+    else:
+        # 使用全天统一频率
+        talk_freq = get_number_input("统一回复频率（1为正常，越高越活跃）", 1.0, 0.1, 5.0)
+        chat['talk_frequency'] = talk_freq
+    
+    # 自动模式配置
+    if mode == 'auto':
+        print("\n配置自动切换参数：")
+        auto_threshold = get_number_input("进入专注模式的阈值（0-2，越小越容易进入）", 1.0, 0, 2)
+        exit_threshold = get_number_input("退出专注模式的阈值（0-2，越小越容易退出）", 1.0, 0, 2)
+        
+        chat['auto_focus_threshold'] = auto_threshold
+        chat['exit_focus_threshold'] = exit_threshold
+    
+    # Normal Chat 配置
+    normal_chat = config.setdefault('normal_chat', {})
+    normal_chat['enable_random_chat'] = get_yes_no_input("启用随机主动聊天", True)
+    if normal_chat['enable_random_chat']:
+        normal_chat['random_chat_probability'] = get_number_input("主动聊天概率（0-1）", 0.1, 0, 1)
+        normal_chat['random_chat_interval'] = get_number_input("主动聊天间隔（分钟）", 30, 5, 180)
+    
+    # Focus Chat 配置
+    focus_chat = config.setdefault('focus_chat', {})
+    focus_chat['max_focus_duration'] = get_number_input("专注模式最大持续时间（分钟）", 30, 5, 120)
+    focus_chat['focus_exit_probability'] = get_number_input("专注模式退出概率（0-1）", 0.1, 0, 1)
+    
+    config['chat'] = chat
+    config['normal_chat'] = normal_chat
+    config['focus_chat'] = focus_chat
+    
+    print(f"聊天模式已设置为：{mode}")
+    return config
+
+def step_groups(config):
+    """配置群聊权限"""
+    print("\n=== 第6步：配置可发消息的群聊 ===")
+    print("提示：只有在此列表中的群聊，机器人才会发送消息")
+    
+    # 尝试从适配器配置中获取当前群组列表
+    current_groups = []
+    try:
+        if os.path.exists(NAPCAT_CONFIG_PATH):
+            with open(NAPCAT_CONFIG_PATH, "r", encoding="utf-8") as f:
+                napcat_config = tomlkit.load(f)
+            current_groups = napcat_config.get('Chat', {}).get('group_list', [])
+    except Exception as e:
+        logger.warning(f"无法读取适配器配置: {str(e)}")
+    
+    # 使用交互式配置
+    groups = get_group_list_input(
+        "配置机器人可发消息的群聊",
+        current_groups
+    )
+    
+    if groups:
+        # 更新 MaiBot-Napcat-Adapter 配置
+        try:
+            if os.path.exists(NAPCAT_CONFIG_PATH):
+                with open(NAPCAT_CONFIG_PATH, "r", encoding="utf-8") as f:
+                    napcat_config = tomlkit.load(f)
                 
-            # 自动退出专注模式阈值
-            current_exit_focus = chat.get('exit_focus_threshold', 1)
-            exit_focus = input(f"自动退出专注聊天的阈值（越低越容易退出，当前：{current_exit_focus}）：").strip()
-            if exit_focus:
-                try:
-                    chat['exit_focus_threshold'] = float(exit_focus)
-                except ValueError:
-                    logger.warning("输入非法，已使用默认值。")
-                    chat['exit_focus_threshold'] = current_exit_focus
+                chat_config = napcat_config.setdefault('Chat', {})
+                chat_config['group_list'] = groups
+                
+                with open(NAPCAT_CONFIG_PATH, "w", encoding="utf-8") as f:
+                    tomlkit.dump(napcat_config, f)
+                logger.info("已配置群组到MaiBot-Napcat-Adapter")
+                print(f"已配置 {len(groups)} 个群聊")
             else:
-                chat['exit_focus_threshold'] = current_exit_focus
-        
-        config['chat'] = chat
-    except Exception as e:
-        logger.error(f"聊天模式配置异常: {str(e)}")
+                logger.warning(f"未找到适配器配置文件: {NAPCAT_CONFIG_PATH}")
+        except Exception as e:
+            logger.error(f"配置适配器失败: {str(e)}")
+    else:
+        print("未配置任何群聊，机器人将不会主动发送消息")
+    
     return config
 
-
-def step_emoji(config):
-    print("\n=== 配置表情包 ===")
-    try:
-        emoji = config.get('emoji', {})
-        
-        # 表情包最大注册数量
-        max_reg_num = input(f"表情包最大注册数量（当前：{emoji.get('max_reg_num', 40)}）：").strip()
-        if max_reg_num.isdigit():
-            emoji['max_reg_num'] = int(max_reg_num)
-        elif max_reg_num:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 是否替换表情包
-        do_replace = input(f"达到最大数量时删除（替换）表情包？[是/否]（当前：{'是' if emoji.get('do_replace', True) else '否'}）：").strip().lower()
-        if do_replace in ['y', 'yes', '是']:
-            emoji['do_replace'] = True
-        elif do_replace in ['n', 'no', '否']:
-            emoji['do_replace'] = False
-        elif do_replace:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 检查表情包间隔
-        check_interval = input(f"检查表情包间隔（分钟，当前：{emoji.get('check_interval', 120)}）：").strip()
-        if check_interval.isdigit():
-            emoji['check_interval'] = int(check_interval)
-        elif check_interval:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 是否保存图片
-        save_pic = input(f"是否保存图片？[是/否]（当前：{'是' if emoji.get('save_pic', True) else '否'}）：").strip().lower()
-        if save_pic in ['y', 'yes', '是']:
-            emoji['save_pic'] = True
-        elif save_pic in ['n', 'no', '否']:
-            emoji['save_pic'] = False
-        elif save_pic:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 是否缓存表情包
-        cache_emoji = input(f"是否缓存表情包？[是/否]（当前：{'是' if emoji.get('cache_emoji', True) else '否'}）：").strip().lower()
-        if cache_emoji in ['y', 'yes', '是']:
-            emoji['cache_emoji'] = True
-        elif cache_emoji in ['n', 'no', '否']:
-            emoji['cache_emoji'] = False
-        elif cache_emoji:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 是否偷取表情包
-        steal_emoji = input(f"是否偷取表情包？[是/否]（当前：{'是' if emoji.get('steal_emoji', True) else '否'}）：").strip().lower()
-        if steal_emoji in ['y', 'yes', '是']:
-            emoji['steal_emoji'] = True
-        elif steal_emoji in ['n', 'no', '否']:
-            emoji['steal_emoji'] = False
-        elif steal_emoji:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 表情包内容过滤
-        content_filtration = input(f"启用表情包内容过滤？[是/否]（当前：{'是' if emoji.get('content_filtration', False) else '否'}）：").strip().lower()
-        if content_filtration in ['y', 'yes', '是']:
-            emoji['content_filtration'] = True
-            filtration_prompt = input(f"表情包过滤要求（当前：{emoji.get('filtration_prompt', '符合公序良俗')}）：").strip()
-            if filtration_prompt:
-                emoji['filtration_prompt'] = filtration_prompt
-            else:
-                emoji['filtration_prompt'] = '符合公序良俗'
-        elif content_filtration in ['n', 'no', '否']:
-            emoji['content_filtration'] = False
-        elif content_filtration:
-            logger.warning("输入非法，已使用默认值。")
-            
-        config['emoji'] = emoji
-    except Exception as e:
-        logger.error(f"表情包配置异常: {str(e)}")
-    return config
-
-def step_chinese_typo(config):
-    print("\n=== 配置中文错别字生成器 ===")
-    try:
-        typo = config.get('chinese_typo', {})
-        enable = input(f"启用中文错别字生成器？[是/否]（当前：{'是' if typo.get('enable', True) else '否'}）：").strip().lower()
-        if enable in ['y', 'yes', '是']:
-            typo['enable'] = True
-        elif enable in ['n', 'no', '否']:
-            typo['enable'] = False
-        elif enable:
-            logger.warning("输入非法，已使用默认值。")
-        config['chinese_typo'] = typo
-    except Exception as e:
-        logger.error(f"中文错别字配置异常: {str(e)}")
-    return config
-
-def step_response_splitter(config):
-    print("\n=== 配置回复分割器 ===")
-    try:
-        splitter = config.get('response_splitter', {})
-        enable = input(f"启用回复分割器？[是/否]（当前：{'是' if splitter.get('enable_response_splitter', True) else '否'}）：").strip().lower()
-        if enable in ['y', 'yes', '是']:
-            splitter['enable_response_splitter'] = True
-        elif enable in ['n', 'no', '否']:
-            splitter['enable_response_splitter'] = False
-        elif enable:
-            logger.warning("输入非法，已使用默认值。")
-        max_len = input(f"回复最大长度（当前：{splitter.get('response_max_length', 256)}）：").strip()
-        if max_len.isdigit():
-            splitter['response_max_length'] = int(max_len)
-        elif max_len:
-            logger.warning("输入非法，已使用默认值。")
-        max_sent = input(f"回复最大句子数（当前：{splitter.get('response_max_sentence_num', 4)}）：").strip()
-        if max_sent.isdigit():
-            splitter['response_max_sentence_num'] = int(max_sent)
-        elif max_sent:
-            logger.warning("输入非法，已使用默认值。")
-        kaomoji = input(f"启用颜文字保护？[是/否]（当前：{'是' if splitter.get('enable_kaomoji_protection', False) else '否'}）：").strip().lower()
-        if kaomoji in ['y', 'yes', '是']:
-            splitter['enable_kaomoji_protection'] = True
-        elif kaomoji in ['n', 'no', '否']:
-            splitter['enable_kaomoji_protection'] = False
-        elif kaomoji:
-            logger.warning("输入非法，已使用默认值。")
-        config['response_splitter'] = splitter
-    except Exception as e:
-        logger.error(f"回复分割器配置异常: {str(e)}")
-    return config
-
-def step_experimental(config):
-    print("\n=== 配置实验性功能 ===")
-    print("实验性功能说明：")
-    print("1. debug_show_chat_mode：是否在回复后显示当前聊天模式")
-    print("2. enable_friend_chat：是否启用好友聊天，允许机器人在私聊中回复")
-    try:
-        experimental = config.get('experimental', {})
-        
-        # 配置调试显示聊天模式
-        debug_show = input(f"是否在回复后显示当前聊天模式？[是/否]（当前：{'是' if experimental.get('debug_show_chat_mode', False) else '否'}）：").strip().lower()
-        if debug_show in ['y', 'yes', '是']:
-            experimental['debug_show_chat_mode'] = True
-        elif debug_show in ['n', 'no', '否']:
-            experimental['debug_show_chat_mode'] = False
-        elif debug_show:
-            logger.warning("输入非法，已使用默认值。")
-            
-        # 配置好友聊天
-        friend_chat = input(f"是否启用好友聊天？[是/否]（当前：{'是' if experimental.get('enable_friend_chat', False) else '否'}）：").strip().lower()
-        if friend_chat in ['y', 'yes', '是']:
-            experimental['enable_friend_chat'] = True
-        elif friend_chat in ['n', 'no', '否']:
-            experimental['enable_friend_chat'] = False
-        elif friend_chat:
-            logger.warning("输入非法，已使用默认值。")
-            
-        config['experimental'] = experimental
-    except Exception as e:
-        logger.error(f"实验性功能配置异常: {str(e)}")
-    return config
-
-def step_info_extraction():
-    print("\n=== 配置信息抽取线程数 ===")
-    try:
-        ensure_lpmm_config_exists()
-        lpmm_data = {}
-        if os.path.exists(LPMM_CONFIG_PATH):
-            with open(LPMM_CONFIG_PATH, "r", encoding="utf-8") as f:
-                lpmm_data = tomlkit.load(f)  # 使用 tomlkit.load
-        info_extraction = lpmm_data.get("info_extraction", {})
-        current_workers = info_extraction.get("workers", 10)
-        value = input(f"实体提取最大线程数（当前：{current_workers}）：").strip()
-        if value:
-            if value.isdigit() and int(value) > 0:
-                info_extraction["workers"] = int(value)
-            else:
-                logger.warning("输入非法，已使用默认值。")
-                info_extraction["workers"] = 10
-        else:
-            info_extraction["workers"] = current_workers
-        lpmm_data["info_extraction"] = info_extraction
-        with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
-            tomlkit.dump(lpmm_data, f)  # 使用 tomlkit.dump
-        logger.info(f"已保存info_extraction配置，workers={info_extraction['workers']}")
-    except Exception as e:
-        logger.error(f"写入lpmm_config.toml info_extraction配置失败: {str(e)}")
-
-def step_api_keys(config):
-    print("\n=== 配置API密钥 ===")
-    try:
-        env_path = os.path.join(BASE_DIR, "modules", "MaiBot", ".env")
-        current_env = dotenv_values(env_path)
-        if os.path.exists(env_path):
-            current_env = dotenv_values(env_path)        
-            current_key = current_env.get("SILICONFLOW_KEY", "")
-        print("请前往 https://cloud.siliconflow.cn/account/ak 获取API秘钥")
-        new_key = input(f"请输入SILICONFLOW_API密钥（当前：{current_key}，留空保持当前）：").strip()
-        if new_key:
-            os.environ["SILICONFLOW_KEY"] = new_key
-            # 确保 .env 文件的目录存在
+def step_api_key(config):
+    """配置API密钥"""
+    print("\n=== 第7步：配置API密钥 ===")
+    print("请前往 https://cloud.siliconflow.cn/account/ak 获取免费API密钥")
+    print("这是必需的，机器人需要API密钥才能正常工作")
+    
+    env_path = os.path.join(BASE_DIR, "modules", "MaiBot", ".env")
+    current_env = dotenv_values(env_path) if os.path.exists(env_path) else {}
+    current_key = current_env.get("SILICONFLOW_KEY", "")
+    
+    if current_key:
+        print(f"当前已配置API密钥：{current_key[:8]}...{current_key[-4:] if len(current_key) > 12 else current_key}")
+        if not get_yes_no_input("是否更换API密钥", False):
+            return config
+    
+    new_key = get_text_input("请输入SILICONFLOW API密钥", "", required=True)
+    
+    if new_key:
+        try:
+            # 保存到环境变量文件
             env_dir = os.path.dirname(env_path)
-            if not os.path.exists(env_dir):
-                os.makedirs(env_dir)
+            os.makedirs(env_dir, exist_ok=True)
             
             env_lines = []
             if os.path.exists(env_path):
                 with open(env_path, "r", encoding="utf-8") as f:
                     env_lines = f.readlines()
+            
+            # 更新或添加 API 密钥
             found = False
             for i, line in enumerate(env_lines):
                 if line.startswith("SILICONFLOW_KEY="):
                     env_lines[i] = f"SILICONFLOW_KEY={new_key}\n"
                     found = True
                     break
+            
             if not found:
-                env_lines.append(f"\nSILICONFLOW_KEY={new_key}")
+                env_lines.append(f"\nSILICONFLOW_KEY={new_key}\n")
+            
             with open(env_path, "w", encoding="utf-8") as f:
-                f.writelines(env_lines)# 同步写入lpmm_config.toml
-            try:
-                ensure_lpmm_config_exists()
-                if os.path.exists(LPMM_CONFIG_PATH):
-                    with open(LPMM_CONFIG_PATH, "r", encoding="utf-8") as f:
-                        lpmm_data = tomlkit.load(f)  # 使用 tomlkit.load
-                else:
-                    lpmm_data = {}
-                providers = lpmm_data.get("llm_providers", [])
-                updated = False
-                for provider in providers:
-                    if provider.get("name") == "siliconflow":
-                        provider["api_key"] = new_key
-                        updated = True
-                        break
-                if not updated:
-                    # 若没有则添加
-                    providers.append({
-                        "name": "siliconflow",
-                        "base_url": "https://api.siliconflow.cn/v1/",
-                        "api_key": new_key
-                    })
-                lpmm_data["llm_providers"] = providers
-                with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
-                    tomlkit.dump(lpmm_data, f)  # 使用 tomlkit.dump
-                logger.info("已同步API密钥到lpmm_config.toml")
-            except Exception as e:
-                logger.error(f"同步API密钥到lpmm_config.toml失败: {str(e)}")
-    except Exception as e:
-        logger.error(f"API密钥配置异常: {str(e)}")
+                f.writelines(env_lines)
+            
+            # 同步到 LPMM 配置
+            ensure_lpmm_config_exists()
+            with open(LPMM_CONFIG_PATH, "r", encoding="utf-8") as f:
+                lpmm_data = tomlkit.load(f)
+            
+            providers = lpmm_data.setdefault("llm_providers", [])
+            
+            # 更新或添加 SiliconFlow 提供商
+            updated = False
+            for provider in providers:
+                if provider.get("name") == "siliconflow":
+                    provider["api_key"] = new_key
+                    updated = True
+                    break
+            
+            if not updated:
+                providers.append({
+                    "name": "siliconflow",
+                    "base_url": "https://api.siliconflow.cn/v1/",
+                    "api_key": new_key
+                })
+            
+            with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
+                tomlkit.dump(lpmm_data, f)
+            
+            logger.info("API密钥配置成功")
+            print("API密钥配置成功")
+            
+        except Exception as e:
+            logger.error(f"API密钥配置失败: {str(e)}")
+            print(f"API密钥配置失败: {str(e)}")
+    
     return config
 
-def step_chat_details(config):
-    print("\n=== 回复模式详细配置 ===")
-    print("是否需要配置详细的回复模式参数？")
-    print("（包括普通聊天和专注聊天的各项参数）")
+def step_advanced_settings(config):
+    """高级设置（可选）"""
+    print("\n=== 第8步：高级设置（可选）===")
     
-    choice = input("是否进行详细配置？[是/否]（默认：否）：").strip().lower()
-    if choice not in ['y', 'yes', '是']:
-        print("跳过详细配置")
+    if not get_yes_no_input("是否配置高级设置", False):
+        print("跳过高级设置，使用推荐默认配置")
+        
+        # 设置新版本重要的默认值
+        config.setdefault('emoji', {
+            'max_reg_num': 60,
+            'do_replace': True,
+            'steal_emoji': True,
+            'check_interval': 10
+        })
+        
+        config.setdefault('memory', {'enable_memory': True})
+        config.setdefault('relationship', {'enable_relationship': True})
+        config.setdefault('lpmm_knowledge', {'enable': True})
+        config.setdefault('chinese_typo', {'enable': True})
+        config.setdefault('response_post_process', {'enable_response_post_process': True})
+        config.setdefault('mood', {'enable_mood': False})  # 新功能默认关闭
+        config.setdefault('keyword_reaction', {'enable': False})  # 新功能默认关闭
+        config.setdefault('experimental', {
+            'enable_friend_chat': False,
+            'debug_show_chat_mode': False
+        })
+        
+        # 新增配置项默认值
+        config.setdefault('message_receive', {
+            'enable_at_filter': True,
+            'enable_keyword_filter': False
+        })
+        
+        config.setdefault('focus_chat_processor', {
+            'enable_processor': True,
+            'processor_threshold': 0.8
+        })
+        
+        config.setdefault('response_splitter', {
+            'enable_split': True,
+            'max_length': 500,
+            'split_strategy': 'smart'
+        })
+        
+        config.setdefault('model', {
+            'default_model': 'Qwen/Qwen2.5-7B-Instruct',
+            'temperature': 0.7,
+            'max_tokens': 2048
+        })
+        
+        config.setdefault('log', {
+            'level': 'INFO',
+            'enable_file_log': True,
+            'max_log_files': 10
+        })
+        
         return config
     
-    try:
-        # 配置普通聊天
-        print("\n--- 配置普通聊天参数 ---")
-        normal_chat = config.get('normal_chat', {})
-        
-        # 首要模型概率
-        first_prob = input(f"首要模型选择概率（0-1，当前：{normal_chat.get('normal_chat_first_probability', 0.3)}）：").strip()
-        if first_prob:
-            try:
-                normal_chat['normal_chat_first_probability'] = float(first_prob)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        # 上下文长度
-        context_size = input(f"上下文长度（当前：{normal_chat.get('max_context_size', 15)}）：").strip()
-        if context_size.isdigit():
-            normal_chat['max_context_size'] = int(context_size)
-        elif context_size:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 表情包概率
-        emoji_chance = input(f"表情包使用概率（0-1，当前：{normal_chat.get('emoji_chance', 0.2)}）：").strip()
-        if emoji_chance:
-            try:
-                normal_chat['emoji_chance'] = float(emoji_chance)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        # 思考超时时间
-        thinking_timeout = input(f"最长思考时间（秒，当前：{normal_chat.get('thinking_timeout', 120)}）：").strip()
-        if thinking_timeout.isdigit():
-            normal_chat['thinking_timeout'] = int(thinking_timeout)
-        elif thinking_timeout:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 回复意愿模式
-        willing_mode = input(f"回复意愿模式（classical/mxp/custom，当前：{normal_chat.get('willing_mode', 'classical')}）：").strip()
-        if willing_mode in ['classical', 'mxp', 'custom']:
-            normal_chat['willing_mode'] = willing_mode
-        elif willing_mode:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 回复频率
-        talk_freq = input(f"回复频率（当前：{normal_chat.get('talk_frequency', 1)}）：").strip()
-        if talk_freq:
-            try:
-                normal_chat['talk_frequency'] = float(talk_freq)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        # 回复意愿放大系数
-        willing_amp = input(f"回复意愿放大系数（当前：{normal_chat.get('response_willing_amplifier', 1)}）：").strip()
-        if willing_amp:
-            try:
-                normal_chat['response_willing_amplifier'] = float(willing_amp)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        # 兴趣度放大系数
-        interest_amp = input(f"回复兴趣度放大系数（当前：{normal_chat.get('response_interested_rate_amplifier', 1)}）：").strip()
-        if interest_amp:
-            try:
-                normal_chat['response_interested_rate_amplifier'] = float(interest_amp)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        # 表情包回复惩罚系数
-        emoji_penalty = input(f"表情包回复惩罚系数（当前：{normal_chat.get('emoji_response_penalty', 0)}）：").strip()
-        if emoji_penalty:
-            try:
-                normal_chat['emoji_response_penalty'] = float(emoji_penalty)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        # 提及bot必然回复
-        mentioned_reply = input(f"提及bot必然回复？[是/否]（当前：{'是' if normal_chat.get('mentioned_bot_inevitable_reply', True) else '否'}）：").strip().lower()
-        if mentioned_reply in ['y', 'yes', '是']:
-            normal_chat['mentioned_bot_inevitable_reply'] = True
-        elif mentioned_reply in ['n', 'no', '否']:
-            normal_chat['mentioned_bot_inevitable_reply'] = False
-        elif mentioned_reply:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # @bot必然回复
-        at_reply = input(f"@bot必然回复？[是/否]（当前：{'是' if normal_chat.get('at_bot_inevitable_reply', True) else '否'}）：").strip().lower()
-        if at_reply in ['y', 'yes', '是']:
-            normal_chat['at_bot_inevitable_reply'] = True
-        elif at_reply in ['n', 'no', '否']:
-            normal_chat['at_bot_inevitable_reply'] = False
-        elif at_reply:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 降低回复频率的群组系数
-        down_freq_rate = input(f"降低回复频率群组系数（当前：{normal_chat.get('down_frequency_rate', 3)}）：").strip()
-        if down_freq_rate:
-            try:
-                normal_chat['down_frequency_rate'] = float(down_freq_rate)
-            except ValueError:
-                logger.warning("输入非法，已使用默认值。")
-        
-        config['normal_chat'] = normal_chat
-        
-        # 配置专注聊天
-        print("\n--- 配置专注聊天参数 ---")
-        focus_chat = config.get('focus_chat', {})
-        
-        # 思考间隔
-        think_interval = input(f"思考间隔（秒，当前：{focus_chat.get('think_interval', 3)}）：").strip()
-        if think_interval.isdigit():
-            focus_chat['think_interval'] = int(think_interval)
-        elif think_interval:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 连续回复能力
-        consecutive = input(f"连续回复能力（当前：{focus_chat.get('consecutive_replies', 1)}）：").strip()
-        if consecutive.isdigit():
-            focus_chat['consecutive_replies'] = int(consecutive)
-        elif consecutive:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 并行处理
-        parallel = input(f"是否并行处理回忆和处理器阶段？[是/否]（当前：{'是' if focus_chat.get('parallel_processing', True) else '否'}）：").strip().lower()
-        if parallel in ['y', 'yes', '是']:
-            focus_chat['parallel_processing'] = True
-        elif parallel in ['n', 'no', '否']:
-            focus_chat['parallel_processing'] = False
-        elif parallel:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 处理器最大时间
-        proc_max_time = input(f"处理器最大时间（秒，当前：{focus_chat.get('processor_max_time', 25)}）：").strip()
-        if proc_max_time.isdigit():
-            focus_chat['processor_max_time'] = int(proc_max_time)
-        elif proc_max_time:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 观察上下文大小
-        obs_context = input(f"观察上下文大小（当前：{focus_chat.get('observation_context_size', 16)}）：").strip()
-        if obs_context.isdigit():
-            focus_chat['observation_context_size'] = int(obs_context)
-        elif obs_context:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 压缩长度
-        comp_length = input(f"上下文压缩长度（当前：{focus_chat.get('compressed_length', 8)}）：").strip()
-        if comp_length.isdigit():
-            focus_chat['compressed_length'] = int(comp_length)
-        elif comp_length:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 最多压缩份数
-        comp_limit = input(f"最多压缩份数（当前：{focus_chat.get('compress_length_limit', 4)}）：").strip()
-        if comp_limit.isdigit():
-            focus_chat['compress_length_limit'] = int(comp_limit)
-        elif comp_limit:
-            logger.warning("输入非法，已使用默认值。")
-        
-        config['focus_chat'] = focus_chat
-        
-        # 配置专注聊天处理器
-        print("\n--- 配置专注聊天处理器 ---")
-        print("注意：打开处理器可以实现更多功能，但会增加token消耗")
-        
-        focus_processor = config.get('focus_chat_processor', {})
-        
-        # 自我识别处理器
-        self_identify = input(f"启用自我识别处理器？[是/否]（当前：{'是' if focus_processor.get('self_identify_processor', True) else '否'}）：").strip().lower()
-        if self_identify in ['y', 'yes', '是']:
-            focus_processor['self_identify_processor'] = True
-        elif self_identify in ['n', 'no', '否']:
-            focus_processor['self_identify_processor'] = False
-        elif self_identify:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 工具使用处理器
-        tool_use = input(f"启用工具使用处理器？[是/否]（当前：{'是' if focus_processor.get('tool_use_processor', False) else '否'}）：").strip().lower()
-        if tool_use in ['y', 'yes', '是']:
-            focus_processor['tool_use_processor'] = True
-        elif tool_use in ['n', 'no', '否']:
-            focus_processor['tool_use_processor'] = False
-        elif tool_use:
-            logger.warning("输入非法，已使用默认值。")
-        
-        # 工作记忆处理器
-        working_memory = input(f"启用工作记忆处理器？（不稳定，消耗量大）[是/否]（当前：{'是' if focus_processor.get('working_memory_processor', False) else '否'}）：").strip().lower()
-        if working_memory in ['y', 'yes', '是']:
-            focus_processor['working_memory_processor'] = True
-        elif working_memory in ['n', 'no', '否']:
-            focus_processor['working_memory_processor'] = False
-        elif working_memory:
-            logger.warning("输入非法，已使用默认值。")
-        
-        config['focus_chat_processor'] = focus_processor
-        
-    except Exception as e:
-        logger.error(f"回复模式详细配置异常: {str(e)}")
+    print("\n配置表情包设置：")
+    emoji = config.setdefault('emoji', {})
+    emoji['max_reg_num'] = get_number_input("表情包最大数量", 60, 10, 200)
+    emoji['do_replace'] = get_yes_no_input("达到最大数量时自动替换旧表情包", True)
+    emoji['steal_emoji'] = get_yes_no_input("是否学习其他人的表情包", True)
+    emoji['check_interval'] = get_number_input("表情包检查间隔（分钟）", 10, 1, 60)
+    
+    print("\n配置记忆和学习：")
+    memory = config.setdefault('memory', {})
+    memory['enable_memory'] = get_yes_no_input("启用记忆系统（让机器人能记住对话）", True)
+    
+    relationship = config.setdefault('relationship', {})
+    relationship['enable_relationship'] = get_yes_no_input("启用关系系统（让机器人记住与用户的关系）", True)
+    
+    print("\n配置情绪和反应系统：")
+    mood = config.setdefault('mood', {})
+    mood['enable_mood'] = get_yes_no_input("启用情绪系统（让机器人有情绪变化）", False)
+    
+    keyword_reaction = config.setdefault('keyword_reaction', {})
+    keyword_reaction['enable'] = get_yes_no_input("启用关键词反应系统", False)
+    
+    print("\n配置回复处理：")
+    chinese_typo = config.setdefault('chinese_typo', {})
+    chinese_typo['enable'] = get_yes_no_input("启用中文错别字生成器（让对话更自然）", True)
+    
+    response_post_process = config.setdefault('response_post_process', {})
+    response_post_process['enable_response_post_process'] = get_yes_no_input("启用回复后处理", True)
+    
+    response_splitter = config.setdefault('response_splitter', {})
+    response_splitter['enable_split'] = get_yes_no_input("启用消息分割（长消息自动分段）", True)
+    if response_splitter['enable_split']:
+        response_splitter['max_length'] = get_number_input("消息分割长度", 500, 100, 2000)
+    
+    print("\n配置实验性功能：")
+    experimental = config.setdefault('experimental', {})
+    experimental['enable_friend_chat'] = get_yes_no_input("启用私聊功能", False)
+    experimental['debug_show_chat_mode'] = get_yes_no_input("显示聊天模式调试信息", False)
+    
+    print("\n配置消息过滤：")
+    message_receive = config.setdefault('message_receive', {})
+    message_receive['enable_at_filter'] = get_yes_no_input("启用@过滤（只回复@消息）", True)
+    message_receive['enable_keyword_filter'] = get_yes_no_input("启用关键词过滤", False)
+    print("高级设置配置完成")
     return config
 
-def ensure_lpmm_config_exists():
-    """确保LPMM配置文件存在，如果不存在则从模板创建"""
-    if not os.path.exists(LPMM_CONFIG_PATH):
-        template_path = os.path.join(BASE_DIR, "modules", "MaiBot", "template", "lpmm_config_template.toml")
-        if os.path.exists(template_path):
-            config_dir = os.path.dirname(LPMM_CONFIG_PATH)
-            if not os.path.exists(config_dir):
-                os.makedirs(config_dir)
-            shutil.copy2(template_path, LPMM_CONFIG_PATH)
-            logger.info(f"已从模板创建LPMM配置文件: {LPMM_CONFIG_PATH}")
-        else:
-            # 如果模板不存在，创建一个基本的配置文件
-            config_dir = os.path.dirname(LPMM_CONFIG_PATH)
-            if not os.path.exists(config_dir):
-                os.makedirs(config_dir)
-            basic_config = tomlkit.document()
-            basic_config["info_extraction"] = {"workers": 10}
-            with open(LPMM_CONFIG_PATH, "w", encoding="utf-8") as f:
-                tomlkit.dump(basic_config, f)
-            logger.info(f"已创建基本LPMM配置文件: {LPMM_CONFIG_PATH}")
+def get_list_input(prompt, current_list=None, item_name="项目", allow_empty=False):
+    """
+    通用的列表交互式输入函数
+    
+    Args:
+        prompt: 配置提示文字
+        current_list: 当前已有的列表
+        item_name: 项目类型名称（如"别名"、"人格特点"等）
+        allow_empty: 是否允许空列表
+    
+    Returns:
+        list: 配置后的列表
+    """
+    if current_list is None:
+        current_list = []
+    
+    result_list = current_list.copy()
+    
+    print(f"\n{prompt}")
+    if result_list:
+        print(f"当前已有{item_name}：")
+        for i, item in enumerate(result_list, 1):
+            print(f"  {i}. {item}")
+    else:
+        print(f"当前没有{item_name}")
+    
+    print("\n操作说明：")
+    print(f"  • 输入 'a' 或 'add' - 添加{item_name}")
+    print(f"  • 输入 'd' 或 'del' - 删除{item_name}")
+    print(f"  • 输入 'l' 或 'list' - 查看当前{item_name}")
+    print("  • 直接回车 - 完成配置")
+    print("  • 输入 'help' - 显示帮助")
+    
+    while True:
+        try:
+            command = input("\n请选择操作 [a添加/d删除/l查看/回车完成]: ").strip().lower()
+            
+            if not command:
+                # 检查是否允许空列表
+                if not allow_empty and not result_list:
+                    print(f"{item_name}不能为空，请至少添加一个")
+                    continue
+                break
+                
+            elif command in ['a', 'add', '添加']:
+                item = input(f"请输入新的{item_name}: ").strip()
+                if item:
+                    if item not in result_list:
+                        result_list.append(item)
+                        print(f"已添加{item_name}: {item}")
+                    else:
+                        print(f"{item_name} '{item}' 已存在")
+                else:
+                    print("输入不能为空")
+                    
+            elif command in ['d', 'del', 'delete', '删除']:
+                if not result_list:
+                    print(f"当前没有{item_name}可删除")
+                    continue
+                
+                print(f"当前{item_name}列表：")
+                for i, item in enumerate(result_list, 1):
+                    print(f"  {i}. {item}")
+                
+                try:
+                    choice = input(f"请输入要删除的{item_name}序号 (1-{len(result_list)}): ").strip()
+                    if choice.isdigit():
+                        index = int(choice) - 1
+                        if 0 <= index < len(result_list):
+                            removed_item = result_list.pop(index)
+                            print(f"已删除{item_name}: {removed_item}")
+                        else:
+                            print("序号超出范围")
+                    else:
+                        print("请输入有效的数字")
+                except ValueError:
+                    print("请输入有效的数字")
+                    
+            elif command in ['l', 'list', '查看']:
+                if result_list:
+                    print(f"当前{item_name}列表：")
+                    for i, item in enumerate(result_list, 1):
+                        print(f"  {i}. {item}")
+                else:
+                    print(f"当前没有{item_name}")
+                    
+            elif command in ['help', '帮助']:
+                print("\n操作帮助：")
+                print(f"  • a/add/添加 - 添加新的{item_name}")
+                print(f"  • d/del/删除 - 删除现有{item_name}")
+                print(f"  • l/list/查看 - 查看当前所有{item_name}")
+                print(f"  • 直接回车 - 完成{item_name}配置")
+                
+            else:
+                print("无效的命令，请输入 'help' 查看帮助")
+                
+        except KeyboardInterrupt:
+            print(f"\n{item_name}配置已取消")
+            break
+        except Exception as e:
+            print(f"操作出错: {str(e)}")
+    
+    return result_list
+
+def get_group_list_input(prompt, current_list=None):
+    """
+    群组列表专用配置函数
+    
+    Args:
+        prompt: 配置提示文字
+        current_list: 当前已有的群组列表
+    
+    Returns:
+        list: 配置后的群组列表
+    """
+    if current_list is None:
+        current_list = []
+    
+    result_list = current_list.copy()
+    
+    print(f"\n{prompt}")
+    if result_list:
+        print("当前已配置群聊：")
+        for i, group_id in enumerate(result_list, 1):
+            print(f"  {i}. {group_id}")
+    else:
+        print("当前没有配置任何群聊")
+    
+    print("\n操作说明:")
+    print("  • 输入 'a' 或 'add' - 添加群聊")
+    print("  • 输入 'd' 或 'del' - 删除群聊")
+    print("  • 输入 'l' 或 'list' - 查看当前群聊")
+    print("  • 直接回车 - 完成配置")
+    print("  • 输入 'help' - 显示帮助")
+    
+    while True:
+        try:
+            command = input("\n请选择操作 [a添加/d删除/l查看/回车完成]: ").strip().lower()
+            
+            if not command:
+                break
+                
+            elif command in ['a', 'add', '添加']:
+                group_input = input("请输入群号: ").strip()
+                if group_input.isdigit():
+                    group_id = int(group_input)
+                    if group_id not in result_list:
+                        result_list.append(group_id)
+                        print(f"已添加群聊: {group_id}")
+                    else:
+                        print(f"群聊 {group_id} 已存在")
+                else:
+                    print("请输入有效的数字群号")
+                    
+            elif command in ['d', 'del', 'delete', '删除']:
+                if not result_list:
+                    print("当前没有群聊可删除")
+                    continue
+                
+                print("当前群聊列表：")
+                for i, group_id in enumerate(result_list, 1):
+                    print(f"  {i}. {group_id}")
+                
+                try:
+                    choice = input(f"请输入要删除的群聊序号 (1-{len(result_list)}): ").strip()
+                    if choice.isdigit():
+                        index = int(choice) - 1
+                        if 0 <= index < len(result_list):
+                            removed_group = result_list.pop(index)
+                            print(f"已删除群聊: {removed_group}")
+                        else:
+                            print("序号超出范围")
+                    else:
+                        print("请输入有效的数字")
+                except ValueError:
+                    print("请输入有效的数字")
+                    
+            elif command in ['l', 'list', '查看']:
+                if result_list:
+                    print("当前群聊列表：")
+                    for i, group_id in enumerate(result_list, 1):
+                        print(f"  {i}. {group_id}")
+                else:
+                    print("当前没有配置任何群聊")
+                    
+            elif command in ['help', '帮助']:
+                print("\n操作帮助:")
+                print("  • a/add/添加 - 添加新的群聊")
+                print("  • d/del/删除 - 删除现有群聊")
+                print("  • l/list/查看 - 查看当前所有群聊")
+                print("  • 直接回车 - 完成群聊配置")
+                
+            else:
+                print("无效的命令，请输入 'help' 查看帮助")
+                
+        except KeyboardInterrupt:
+            print("\n群聊配置已取消")
+            break
+        except Exception as e:
+            print(f"操作出错: {str(e)}")
+    
+    return result_list
 
 def main():
-    print("---欢迎使用简易配置向导！---")
-    print("请按照提示输入配置信息。")
-    print("留空则使用默认值，直接回车跳过该步骤。")
-    print("输入 Ctrl+C 取消配置。")
-    print("------------------------")
-    print("注意！！此配置向导只是简易版")
-    print("想要配置更多请打开config/bot_config.toml进行手动编辑！")
-    print("------------------------")
-    print("制作 By MotricSeven")
-    print("------------------------\n")
-
+    """主配置流程"""
     try:
+        print_welcome()
+        
+        # 备份配置
         backup_config()
-        config = load_config()          
-        steps = [
-            step_bot,
-            step_groups,
-            step_personality,
-            step_identity,
-            step_expression,  # 新增
-            step_response,
-            step_chat_details,  # 新增：回复模式详细配置
-            step_emoji,
-            step_chinese_typo,
-            step_response_splitter,
-            step_experimental,
-            step_info_extraction,  # 新增
-            step_api_keys
-        ]
-        for step in steps:
-            # step_info_extraction 不需要传参
-            if step == step_info_extraction:
-                step()
-            else:
-                config = step(config)
+        
+        # 加载配置
+        config = load_config()
+        
+        # 执行配置步骤（新版本流程）
+        config = step_basic_info(config)         # 第1步：基本信息
+        config = step_personality(config)        # 第2步：人格设定
+        config = step_identity(config)           # 第3步：身份特征
+        config = step_expression(config)         # 第4步：表达方式
+        config = step_chat_mode(config)          # 第5步：聊天模式
+        config = step_groups(config)             # 第6步：群聊权限
+        config = step_api_key(config)            # 第7步：API密钥
+        config = step_advanced_settings(config)  # 第8步：高级设置
+        
+        # 保存配置
         save_config(config)
-        print("\n配置已保存！")
+        
+        print("\n" + "=" * 60)
+        print("新版本 MaiBot 配置完成！")
+        print("=" * 60)
+        print("所有配置已保存成功")
+        print("现在可以启动 MaiBot 了")
+        print("如需更多配置，请编辑 config/bot_config.toml 文件")
+        print("=" * 60)
+        
+    except KeyboardInterrupt:
+        print("\n\n配置已取消")
+        print("下次启动时可以重新配置")
     except Exception as e:
-        logger.critical(f"配置流程异常终止: {str(e)}")
+        logger.error(f"配置过程出现错误: {str(e)}")
+        print(f"\n配置失败: {str(e)}")
+        print("请检查错误信息或寻求帮助")
 
 if __name__ == "__main__":
-    ensure_lpmm_config_exists()
     main()
