@@ -204,15 +204,15 @@ def modify_allowed_chats():
         with open(config_path, 'r', encoding='utf-8') as f:
             config = tomlkit.load(f)
         
-        # 确保Chat配置段存在
-        if 'Chat' not in config:
-            config['Chat'] = tomlkit.table()
-            config['Chat']['group_list_type'] = "whitelist"
-            config['Chat']['group_list'] = []
-            config['Chat']['private_list_type'] = "whitelist"
-            config['Chat']['private_list'] = []
-            config['Chat']['ban_user_id'] = []
-            config['Chat']['enable_poke'] = True
+        # 确保chat配置段存在
+        if 'chat' not in config:
+            config['chat'] = tomlkit.table()
+            config['chat']['group_list_type'] = "whitelist"
+            config['chat']['group_list'] = []
+            config['chat']['private_list_type'] = "whitelist"
+            config['chat']['private_list'] = []
+            config['chat']['ban_user_id'] = []
+            config['chat']['enable_poke'] = True
         
         while True:
             print("\n=== 修改可发消息群聊&私聊配置 ===")
@@ -252,8 +252,8 @@ def _manage_group_chat_config(config):
     """管理群组聊天配置"""
     while True:
         print("\n=== 群组聊天配置管理 ===")
-        current_type = config.get('Chat', {}).get('group_list_type', 'whitelist')
-        current_list = config.get('Chat', {}).get('group_list', [])
+        current_type = config.get('chat', {}).get('group_list_type', 'whitelist')
+        current_list = config.get('chat', {}).get('group_list', [])
         
         print(f"当前群组名单类型: {current_type} ({'白名单' if current_type == 'whitelist' else '黑名单'})")
         print(f"当前群组列表: {list(current_list) if current_list else '(空)'}")
@@ -293,8 +293,8 @@ def _manage_private_chat_config(config):
     """管理私聊配置"""
     while True:
         print("\n=== 私聊配置管理 ===")
-        current_type = config.get('Chat', {}).get('private_list_type', 'whitelist')
-        current_list = config.get('Chat', {}).get('private_list', [])
+        current_type = config.get('chat', {}).get('private_list_type', 'whitelist')
+        current_list = config.get('chat', {}).get('private_list', [])
         
         print(f"当前私聊名单类型: {current_type} ({'白名单' if current_type == 'whitelist' else '黑名单'})")
         print(f"当前私聊列表: {list(current_list) if current_list else '(空)'}")
@@ -334,7 +334,7 @@ def _manage_ban_user_list(config):
     """管理全局禁止名单"""
     while True:
         print("\n=== 全局禁止名单管理 ===")
-        current_list = config.get('Chat', {}).get('ban_user_id', [])
+        current_list = config.get('chat', {}).get('ban_user_id', [])
         
         print(f"当前全局禁止列表: {list(current_list) if current_list else '(空)'}")
         print("说明：全局禁止名单中的用户无法进行任何聊天（群聊和私聊）")
@@ -365,7 +365,7 @@ def _manage_ban_user_list(config):
 def _display_current_config(config):
     """显示当前完整配置"""
     print("\n=== 当前聊天配置总览 ===")
-    chat_config = config.get('Chat', {})
+    chat_config = config.get('chat', {})
     
     # 群组配置
     group_type = chat_config.get('group_list_type', 'whitelist')
@@ -392,13 +392,13 @@ def _display_current_config(config):
 
 def _toggle_group_list_type(config):
     """切换群组名单类型"""
-    current_type = config.get('Chat', {}).get('group_list_type', 'whitelist')
+    current_type = config.get('chat', {}).get('group_list_type', 'whitelist')
     new_type = 'blacklist' if current_type == 'whitelist' else 'whitelist'
     
     confirm = input(f"确认将群组名单类型从 {current_type}({'白名单' if current_type == 'whitelist' else '黑名单'}) 切换到 {new_type}({'白名单' if new_type == 'whitelist' else '黑名单'})? (y/N): ").strip().lower()
     
     if confirm == 'y':
-        config['Chat']['group_list_type'] = new_type
+        config['chat']['group_list_type'] = new_type
         logger.info(f"群组名单类型已切换为: {new_type}")
     else:
         logger.info("操作已取消")
@@ -417,13 +417,13 @@ def _add_group_to_list(config):
             continue
         
         group_id = int(group_id)
-        current_list = list(config.get('Chat', {}).get('group_list', []))
+        current_list = list(config.get('chat', {}).get('group_list', []))
         
         if group_id in current_list:
             logger.warning(f"群号 {group_id} 已存在于列表中")
         else:
             current_list.append(group_id)
-            config['Chat']['group_list'] = current_list
+            config['chat']['group_list'] = current_list
             logger.info(f"群号 {group_id} 已添加到群组列表")
         
         if input("是否继续添加其他群号? (y/N): ").strip().lower() != 'y':
@@ -432,7 +432,7 @@ def _add_group_to_list(config):
 
 def _remove_group_from_list(config):
     """从群组列表移除群号"""
-    current_list = list(config.get('Chat', {}).get('group_list', []))
+    current_list = list(config.get('chat', {}).get('group_list', []))
     
     if not current_list:
         logger.warning("群组列表为空，无法删除")
@@ -454,7 +454,7 @@ def _remove_group_from_list(config):
         
         if group_id in current_list:
             current_list.remove(group_id)
-            config['Chat']['group_list'] = current_list
+            config['chat']['group_list'] = current_list
             logger.info(f"群号 {group_id} 已从群组列表中删除")
         else:
             logger.warning(f"群号 {group_id} 不在当前群组列表中")
@@ -465,7 +465,7 @@ def _remove_group_from_list(config):
 
 def _clear_group_list(config):
     """清空群组列表"""
-    current_list = config.get('Chat', {}).get('group_list', [])
+    current_list = config.get('chat', {}).get('group_list', [])
     
     if not current_list:
         logger.warning("群组列表已经为空")
@@ -474,7 +474,7 @@ def _clear_group_list(config):
     confirm = input(f"确认清空群组列表吗？当前有 {len(current_list)} 个群组 (y/N): ").strip().lower()
     
     if confirm == 'y':
-        config['Chat']['group_list'] = []
+        config['chat']['group_list'] = []
         logger.info("群组列表已清空")
     else:
         logger.info("操作已取消")
@@ -482,8 +482,8 @@ def _clear_group_list(config):
 
 def _show_group_list_details(config):
     """显示群组列表详情"""
-    current_list = config.get('Chat', {}).get('group_list', [])
-    list_type = config.get('Chat', {}).get('group_list_type', 'whitelist')
+    current_list = config.get('chat', {}).get('group_list', [])
+    list_type = config.get('chat', {}).get('group_list_type', 'whitelist')
     
     print(f"\n群组列表详情（{list_type} - {'白名单' if list_type == 'whitelist' else '黑名单'}）:")
     
@@ -498,13 +498,13 @@ def _show_group_list_details(config):
 
 def _toggle_private_list_type(config):
     """切换私聊名单类型"""
-    current_type = config.get('Chat', {}).get('private_list_type', 'whitelist')
+    current_type = config.get('chat', {}).get('private_list_type', 'whitelist')
     new_type = 'blacklist' if current_type == 'whitelist' else 'whitelist'
     
     confirm = input(f"确认将私聊名单类型从 {current_type}({'白名单' if current_type == 'whitelist' else '黑名单'}) 切换到 {new_type}({'白名单' if new_type == 'whitelist' else '黑名单'})? (y/N): ").strip().lower()
     
     if confirm == 'y':
-        config['Chat']['private_list_type'] = new_type
+        config['chat']['private_list_type'] = new_type
         logger.info(f"私聊名单类型已切换为: {new_type}")
     else:
         logger.info("操作已取消")
@@ -523,13 +523,13 @@ def _add_user_to_private_list(config):
             continue
         
         user_id = int(user_id)
-        current_list = list(config.get('Chat', {}).get('private_list', []))
+        current_list = list(config.get('chat', {}).get('private_list', []))
         
         if user_id in current_list:
             logger.warning(f"用户 {user_id} 已存在于私聊列表中")
         else:
             current_list.append(user_id)
-            config['Chat']['private_list'] = current_list
+            config['chat']['private_list'] = current_list
             logger.info(f"用户 {user_id} 已添加到私聊列表")
         
         if input("是否继续添加其他用户? (y/N): ").strip().lower() != 'y':
@@ -538,7 +538,7 @@ def _add_user_to_private_list(config):
 
 def _remove_user_from_private_list(config):
     """从私聊列表移除用户"""
-    current_list = list(config.get('Chat', {}).get('private_list', []))
+    current_list = list(config.get('chat', {}).get('private_list', []))
     
     if not current_list:
         logger.warning("私聊列表为空，无法删除")
@@ -560,7 +560,7 @@ def _remove_user_from_private_list(config):
         
         if user_id in current_list:
             current_list.remove(user_id)
-            config['Chat']['private_list'] = current_list
+            config['chat']['private_list'] = current_list
             logger.info(f"用户 {user_id} 已从私聊列表中删除")
         else:
             logger.warning(f"用户 {user_id} 不在当前私聊列表中")
@@ -571,7 +571,7 @@ def _remove_user_from_private_list(config):
 
 def _clear_private_list(config):
     """清空私聊列表"""
-    current_list = config.get('Chat', {}).get('private_list', [])
+    current_list = config.get('chat', {}).get('private_list', [])
     
     if not current_list:
         logger.warning("私聊列表已经为空")
@@ -580,7 +580,7 @@ def _clear_private_list(config):
     confirm = input(f"确认清空私聊列表吗？当前有 {len(current_list)} 个用户 (y/N): ").strip().lower()
     
     if confirm == 'y':
-        config['Chat']['private_list'] = []
+        config['chat']['private_list'] = []
         logger.info("私聊列表已清空")
     else:
         logger.info("操作已取消")
@@ -588,8 +588,8 @@ def _clear_private_list(config):
 
 def _show_private_list_details(config):
     """显示私聊列表详情"""
-    current_list = config.get('Chat', {}).get('private_list', [])
-    list_type = config.get('Chat', {}).get('private_list_type', 'whitelist')
+    current_list = config.get('chat', {}).get('private_list', [])
+    list_type = config.get('chat', {}).get('private_list_type', 'whitelist')
     
     print(f"\n私聊列表详情（{list_type} - {'白名单' if list_type == 'whitelist' else '黑名单'}）:")
     
@@ -615,13 +615,13 @@ def _add_user_to_ban_list(config):
             continue
         
         user_id = int(user_id)
-        current_list = list(config.get('Chat', {}).get('ban_user_id', []))
+        current_list = list(config.get('chat', {}).get('ban_user_id', []))
         
         if user_id in current_list:
             logger.warning(f"用户 {user_id} 已在全局禁止名单中")
         else:
             current_list.append(user_id)
-            config['Chat']['ban_user_id'] = current_list
+            config['chat']['ban_user_id'] = current_list
             logger.info(f"用户 {user_id} 已添加到全局禁止名单")
         
         if input("是否继续添加其他用户? (y/N): ").strip().lower() != 'y':
@@ -630,7 +630,7 @@ def _add_user_to_ban_list(config):
 
 def _remove_user_from_ban_list(config):
     """从全局禁止名单移除用户"""
-    current_list = list(config.get('Chat', {}).get('ban_user_id', []))
+    current_list = list(config.get('chat', {}).get('ban_user_id', []))
     
     if not current_list:
         logger.warning("全局禁止名单为空，无法删除")
@@ -652,7 +652,7 @@ def _remove_user_from_ban_list(config):
         
         if user_id in current_list:
             current_list.remove(user_id)
-            config['Chat']['ban_user_id'] = current_list
+            config['chat']['ban_user_id'] = current_list
             logger.info(f"用户 {user_id} 已从全局禁止名单中移除")
         else:
             logger.warning(f"用户 {user_id} 不在当前全局禁止名单中")
@@ -663,7 +663,7 @@ def _remove_user_from_ban_list(config):
 
 def _clear_ban_list(config):
     """清空全局禁止名单"""
-    current_list = config.get('Chat', {}).get('ban_user_id', [])
+    current_list = config.get('chat', {}).get('ban_user_id', [])
     
     if not current_list:
         logger.warning("全局禁止名单已经为空")
@@ -672,7 +672,7 @@ def _clear_ban_list(config):
     confirm = input(f"确认清空全局禁止名单吗？当前有 {len(current_list)} 个用户 (y/N): ").strip().lower()
     
     if confirm == 'y':
-        config['Chat']['ban_user_id'] = []
+        config['chat']['ban_user_id'] = []
         logger.info("全局禁止名单已清空")
     else:
         logger.info("操作已取消")
@@ -680,7 +680,7 @@ def _clear_ban_list(config):
 
 def _show_ban_list_details(config):
     """显示全局禁止名单详情"""
-    current_list = config.get('Chat', {}).get('ban_user_id', [])
+    current_list = config.get('chat', {}).get('ban_user_id', [])
     
     print("\n全局禁止名单详情:")
     
