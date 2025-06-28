@@ -374,7 +374,7 @@ def step_groups(config):
         if os.path.exists(NAPCAT_CONFIG_PATH):
             with open(NAPCAT_CONFIG_PATH, "r", encoding="utf-8") as f:
                 napcat_config = tomlkit.load(f)
-            current_groups = napcat_config.get('Chat', {}).get('group_list', [])
+            current_groups = napcat_config.get('chat', {}).get('group_list', [])
     except Exception as e:
         logger.warning(f"无法读取适配器配置: {str(e)}")
     
@@ -391,7 +391,7 @@ def step_groups(config):
                 with open(NAPCAT_CONFIG_PATH, "r", encoding="utf-8") as f:
                     napcat_config = tomlkit.load(f)
                 
-                chat_config = napcat_config.setdefault('Chat', {})
+                chat_config = napcat_config.setdefault('chat', {})
                 chat_config['group_list'] = groups
                 
                 with open(NAPCAT_CONFIG_PATH, "w", encoding="utf-8") as f:
