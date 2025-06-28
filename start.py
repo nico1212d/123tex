@@ -13,6 +13,9 @@ except ImportError:
     from loguru import logger
 import requests
 
+
+ONEKEY_VERSION = "4.1.0" 
+
 def get_absolute_path(relative_path: str) -> str:
     """获取绝对路径
     
@@ -1175,7 +1178,7 @@ class MenuManager:
         """显示菜单头部"""
         print("\n=== MaiBot 控制台 ===")
         print("制作By MaiBot Team @MotricSeven")
-        print("版本 4.0.0")
+        print(f"版本 {ONEKEY_VERSION}")
         print("一键包附加脚本仓库：https://github.com/DrSmoothl/MaiBotOneKey")
         print("麦麦MaiBot主仓库：https://github.com/MaiM-with-u/MaiBot")
         print("如果可以的话，希望您可以给这两个仓库点个Star！")
