@@ -14,8 +14,9 @@ except ImportError:
 # 配置文件路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot", "config", "bot_config.toml")
-BACKUP_PATH = f"{CONFIG_PATH}.bak"
+CONFIG_BACKUP_PATH = f"{CONFIG_PATH}.bak"
 LPMM_CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot", "config", "lpmm_config.toml")
+LPMM_BACKUP_PATH = f"{LPMM_CONFIG_PATH}.bak"
 NAPCAT_CONFIG_PATH = os.path.join(BASE_DIR, "modules", "MaiBot-Napcat-Adapter", "config.toml")
 
 def print_welcome():
@@ -77,12 +78,18 @@ def get_text_input(prompt, default="", required=False):
 def backup_config():
     """备份配置文件"""
     try:
-        if os.path.exists(CONFIG_PATH) and not os.path.exists(BACKUP_PATH):
+        if os.path.exists(CONFIG_PATH) and not os.path.exists(CONFIG_BACKUP_PATH):
             os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
-            shutil.copy(CONFIG_PATH, BACKUP_PATH)
-            logger.info(f"已创建配置文件备份：{BACKUP_PATH}")
+            shutil.copy(CONFIG_PATH, CONFIG_BACKUP_PATH)
+            logger.info(f"已创建配置文件备份：{CONFIG_BACKUP_PATH}")
         else:
             logger.info("配置备份文件已存在，跳过备份")
+        if os.path.exists(LPMM_CONFIG_PATH) and not os.path.exists(LPMM_BACKUP_PATH):
+            os.makedirs(os.path.dirname(LPMM_CONFIG_PATH), exist_ok=True)
+            shutil.copy(LPMM_CONFIG_PATH, LPMM_BACKUP_PATH)
+            logger.info(f"已创建LPMM配置文件备份：{LPMM_BACKUP_PATH}")
+        else:
+            logger.info("LPMM配置备份文件已存在，跳过备份")
     except Exception as e:
         logger.error(f"备份失败: {str(e)}")
         raise
