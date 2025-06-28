@@ -150,6 +150,7 @@ def update_repository(repo_path, repo_name, remote_urls=None, force_reset=False)
     # 如果需要强制覆盖本地更改，先执行 reset --hard 和 clean -fd
     if force_reset:
         print("⚠️  一键包将强制覆盖所有本地更改（包括未提交和已暂存的修改，配置文件和数据文件夹不在这个范围），此操作不可逆！")
+        print("⚠️  如果你是第一次启动,请忽略此提示。")
         confirm = input("是否继续？输入 y 确认，其他键取消: ").strip().lower()
         if confirm != 'y':
             print("用户取消强制更新操作。")
