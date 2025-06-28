@@ -266,6 +266,7 @@ def main() -> None:
     """主函数"""
     try:
         logger.info("MaiBot 一键包启动")
+        check_and_create_config_files()
         
         # 检查目录路径合法性
         if check_dir_legal():
