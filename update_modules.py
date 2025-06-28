@@ -53,7 +53,7 @@ def get_git_command():
 # 全局变量存储git命令
 GIT_COMMAND = None
 
-def run_command(command, cwd=None, description=""):
+def run_command(command, cwd=None, description="", realtime_output=False):
     """执行命令"""
     try:
         if description:
@@ -65,27 +65,65 @@ def run_command(command, cwd=None, description=""):
         env['PYTHONIOENCODING'] = 'utf-8'
         env['LANG'] = 'zh_CN.UTF-8'
         
-        result = subprocess.run(
-            command,
-            cwd=cwd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='ignore',  # 忽略编码错误
-            env=env
-        )
-        
-        if result.returncode == 0:
-            if result.stdout and result.stdout.strip():
-                print(f"✅ 成功: {result.stdout.strip()}")
+        if realtime_output:
+            # 实时输出模式
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding='utf-8',
+                errors='ignore',
+                env=env,
+                bufsize=1,  # 行缓冲
+                universal_newlines=True
+            )
+            
+            # 实时读取并输出
+            output_lines = []
+            while True:
+                line = process.stdout.readline()
+                if line:
+                    line = line.rstrip('\n\r')
+                    print(line)
+                    output_lines.append(line)
+                elif process.poll() is not None:
+                    break
+            
+            # 等待进程完成
+            return_code = process.wait()
+            
+            if return_code == 0:
+                print("✅ 执行完成")
+                return True
             else:
-                print("✅ 成功")
-            return True
+                print(f"❌ 执行失败，返回码: {return_code}")
+                return False
         else:
-            error_msg = result.stderr.strip() if result.stderr else "未知错误"
-            print(f"❌ 错误: {error_msg}")
-            return False
+            # 原有的缓冲输出模式
+            result = subprocess.run(
+                command,
+                cwd=cwd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='ignore',  # 忽略编码错误
+                env=env
+            )
+            
+            if result.returncode == 0:
+                if result.stdout and result.stdout.strip():
+                    print(f"✅ 成功: {result.stdout.strip()}")
+                else:
+                    print("✅ 成功")
+                return True
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                print(f"❌ 错误: {error_msg}")
+                return False
     except Exception as e:
         print(f"❌ 执行命令时发生异常: {e}")
         return False
@@ -121,9 +159,10 @@ def install_requirements(repo_path, repo_name):
     print(f"{'='*40}")
     
     # 获取Python可执行文件路径
-    python_cmd = sys.executable    # 安装依赖（使用阿里云镜像源，禁用进度条避免编码问题）
+    python_cmd = sys.executable
+    # 安装依赖（使用阿里云镜像源，禁用进度条避免编码问题）
     install_cmd = f'"{python_cmd}" -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com --upgrade --no-color --disable-pip-version-check --progress-bar off'
-    success = run_command(install_cmd, repo_path, f"安装 {repo_name} 依赖")
+    success = run_command(install_cmd, repo_path, f"安装 {repo_name} 依赖", realtime_output=True)
     
     if success:
         print(f"✅ {repo_name} 依赖安装完成")
