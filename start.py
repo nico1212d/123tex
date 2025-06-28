@@ -1396,7 +1396,7 @@ def check_and_create_config_files() -> bool:
         },
         {
             'name': 'MaiBot环境文件',
-            'path': get_absolute_path('modules/MaiBot/config/.env'),
+            'path': get_absolute_path('modules/MaiBot/.env'),
             'template': get_absolute_path('modules/MaiBot/template/template.env'),
             'is_directory': False
         },
