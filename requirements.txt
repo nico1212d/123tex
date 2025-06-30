@@ -2,3 +2,4 @@ loguru
 tomlkit
 toml
 attrs
+structlog
