@@ -1159,6 +1159,7 @@ class MenuManager:
         # 其他功能组
         other_group = MenuGroup("其他功能：", [
             MenuItem("16", "快捷打开配置文件", lambda: log_operation_result("打开配置文件", open_config_file())),
+            MenuItem("17", "管理API服务商", lambda: log_operation_result("管理API服务商", add_api_provider())),
         ])
         
         # 退出组
@@ -1466,6 +1467,399 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("\n程序已被用户中断")
         
+
+
+
+def add_api_provider():
+    """交互式管理API服务商"""
+    env_path = get_absolute_path('modules/MaiBot/.env')
+    
+    # 检查.env文件是否存在
+    if not os.path.exists(env_path):
+        logger.error(f"错误：找不到环境配置文件 {env_path}")
+        logger.info("请确保MaiBot项目已正确初始化")
+        return False
+    
+    try:
+        while True:
+            print("\n=== API服务商管理 ===")
+            print("1. 添加新的API服务商")
+            print("2. 修改现有API服务商")
+            print("3. 删除API服务商")
+            print("4. 查看所有API服务商")
+            print("0. 返回主菜单")
+            
+            choice = input("请选择操作: ").strip()
+            
+            if choice == '0':
+                logger.info("已退出API服务商管理")
+                break
+            elif choice == '1':
+                _add_new_api_provider(env_path)
+            elif choice == '2':
+                _modify_api_provider(env_path)
+            elif choice == '3':
+                _delete_api_provider(env_path)
+            elif choice == '4':
+                _display_all_api_providers(env_path)
+            else:
+                logger.error("无效选择，请重新输入")
+                continue
+                
+    except Exception as e:
+        logger.error(f"操作API服务商配置失败：{str(e)}")
+        return False
+    
+    return True
+
+
+def _get_existing_providers(env_path: str) -> dict:
+    """获取现有的API服务商配置
+    
+    Args:
+        env_path: .env文件路径
+        
+    Returns:
+        dict: 服务商配置字典，格式为 {provider_name: {'base_url': url, 'key': key}}
+    """
+    from dotenv import load_dotenv
+    
+    providers = {}
+    
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            env_content = f.read()
+        
+        load_dotenv(env_path)
+        
+        # 查找现有的API服务商
+        provider_keys = set()
+        for line in env_content.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                key = line.split('=')[0].strip()
+                if key.endswith('_BASE_URL') or key.endswith('_KEY'):
+                    provider = key.replace('_BASE_URL', '').replace('_KEY', '')
+                    provider_keys.add(provider)
+        
+        # 获取每个服务商的完整配置
+        for provider in provider_keys:
+            base_url_key = f"{provider}_BASE_URL"
+            api_key_key = f"{provider}_KEY"
+            
+            base_url = os.getenv(base_url_key, '')
+            api_key = os.getenv(api_key_key, '')
+            
+            providers[provider] = {
+                'base_url': base_url,
+                'key': api_key
+            }
+            
+    except Exception as e:
+        logger.warning(f"读取现有配置时出错：{str(e)}")
+    
+    return providers
+
+
+def _mask_api_key(api_key: str) -> str:
+    """隐藏API Key的敏感部分
+    
+    Args:
+        api_key: 原始API Key
+        
+    Returns:
+        str: 隐藏后的API Key
+    """
+    if not api_key:
+        return "(空)"
+    
+    if len(api_key) > 8:
+        return api_key[:4] + '*' * 10 + api_key[-4:]
+    else:
+        return '*' * 10
+
+
+def _add_new_api_provider(env_path: str) -> bool:
+    """添加新的API服务商"""
+    from dotenv import set_key
+    
+    print("\n=== 添加新的API服务商 ===")
+    print("注意：服务商名称将用于生成环境变量，建议使用大写英文")
+    print("例如：OPENAI, ANTHROPIC, GOOGLE, SILICONFLOW 等")
+    print("生成格式：{提供商名称}_BASE_URL 和 {提供商名称}_KEY")
+    print("======================")
+    
+    existing_providers = _get_existing_providers(env_path)
+    if existing_providers:
+        print(f"当前已配置的API服务商：{', '.join(sorted(existing_providers.keys()))}")
+        print("======================")
+    
+    while True:
+        # 输入服务商名称
+        provider_name = input("请输入API服务商名称（仅英文字母和下划线，建议大写，输入0返回）: ").strip()
+        
+        if provider_name == '0':
+            return True
+        
+        # 验证服务商名称
+        if not re.match(r'^[A-Za-z_]+$', provider_name):
+            logger.error("错误：服务商名称只能包含英文字母和下划线，请重新输入")
+            continue
+        
+        # 转换为大写
+        provider_name = provider_name.upper()
+        
+        # 检查是否已存在
+        if provider_name in existing_providers:
+            print(f"\n⚠️  警告：服务商 {provider_name} 已存在")
+            overwrite = input("是否覆盖现有配置？(y/N): ").strip().lower()
+            if overwrite != 'y':
+                logger.info("已取消覆盖，请使用不同的服务商名称")
+                continue
+        
+        # 输入API URL
+        while True:
+            api_url = input(f"请输入 {provider_name} 的API URL: ").strip()
+            if not api_url:
+                logger.error("API URL不能为空，请重新输入")
+                continue
+            
+            # URL格式验证
+            if not (api_url.startswith('http://') or api_url.startswith('https://')):
+                logger.warning("警告：API URL 通常应该以 http:// 或 https:// 开头")
+                confirm = input("确定要继续吗？(y/N): ").strip().lower()
+                if confirm != 'y':
+                    continue
+            break
+        
+        # 输入API Key
+        api_key = input(f"请输入 {provider_name} 的API Key（可为空，稍后再配置）: ").strip()
+        
+        try:
+            # 保存到.env文件
+            base_url_key = f"{provider_name}_BASE_URL"
+            api_key_key = f"{provider_name}_KEY"
+            
+            set_key(env_path, base_url_key, api_url)
+            set_key(env_path, api_key_key, api_key if api_key else "")
+            
+            logger.info(f"✅ API服务商 {provider_name} 已成功添加！")
+            print("环境变量已设置：")
+            print(f"  {base_url_key}={api_url}")
+            print(f"  {api_key_key}={_mask_api_key(api_key)}")
+            
+            # 询问是否继续添加
+            if input("\n是否继续添加其他API服务商？(y/N): ").strip().lower() != 'y':
+                break
+                
+        except Exception as e:
+            logger.error(f"保存配置失败：{str(e)}")
+            return False
+    
+    return True
+
+
+def _modify_api_provider(env_path: str) -> bool:
+    """修改现有API服务商"""
+    from dotenv import set_key
+    
+    existing_providers = _get_existing_providers(env_path)
+    
+    if not existing_providers:
+        logger.warning("当前没有已配置的API服务商，请先添加")
+        return True
+    
+    print("\n=== 修改现有API服务商 ===")
+    provider_list = list(existing_providers.keys())
+    
+    for i, provider in enumerate(provider_list, 1):
+        config = existing_providers[provider]
+        print(f"{i}. {provider}")
+        print(f"   BASE_URL: {config['base_url']}")
+        print(f"   KEY: {_mask_api_key(config['key'])}")
+    
+    while True:
+        choice = input(f"请选择要修改的服务商编号（1-{len(provider_list)}，输入0返回）: ").strip()
+        
+        if choice == '0':
+            return True
+        
+        if not choice.isdigit() or not (1 <= int(choice) <= len(provider_list)):
+            logger.error("无效选择，请重新输入")
+            continue
+        
+        provider_name = provider_list[int(choice) - 1]
+        current_config = existing_providers[provider_name]
+        
+        print(f"\n当前配置 - {provider_name}:")
+        print(f"  BASE_URL: {current_config['base_url']}")
+        print(f"  KEY: {_mask_api_key(current_config['key'])}")
+        
+        # 修改BASE_URL
+        print("\n修改BASE_URL（直接回车保持不变）:")
+        new_url = input(f"新的API URL [{current_config['base_url']}]: ").strip()
+        if not new_url:
+            new_url = current_config['base_url']
+        elif not (new_url.startswith('http://') or new_url.startswith('https://')):
+            logger.warning("警告：API URL 通常应该以 http:// 或 https:// 开头")
+            confirm = input("确定要继续吗？(y/N): ").strip().lower()
+            if confirm != 'y':
+                new_url = current_config['base_url']
+        
+        # 修改API Key
+        print("\n修改API Key（直接回车保持不变，输入'clear'清空）:")
+        new_key = input(f"新的API Key [{_mask_api_key(current_config['key'])}]: ").strip()
+        if not new_key:
+            new_key = current_config['key']
+        elif new_key.lower() == 'clear':
+            new_key = ""
+        
+        try:
+            # 保存修改
+            base_url_key = f"{provider_name}_BASE_URL"
+            api_key_key = f"{provider_name}_KEY"
+            
+            set_key(env_path, base_url_key, new_url)
+            set_key(env_path, api_key_key, new_key)
+            
+            logger.info(f"✅ API服务商 {provider_name} 配置已更新！")
+            print("新的配置：")
+            print(f"  {base_url_key}={new_url}")
+            print(f"  {api_key_key}={_mask_api_key(new_key)}")
+            
+            # 询问是否继续修改其他服务商
+            if input("\n是否继续修改其他API服务商？(y/N): ").strip().lower() != 'y':
+                break
+            
+            # 重新获取配置（因为可能有更新）
+            existing_providers = _get_existing_providers(env_path)
+            provider_list = list(existing_providers.keys())
+            
+            if not provider_list:
+                break
+            
+            print("\n当前API服务商：")
+            for i, provider in enumerate(provider_list, 1):
+                config = existing_providers[provider]
+                print(f"{i}. {provider}")
+                print(f"   BASE_URL: {config['base_url']}")
+                print(f"   KEY: {_mask_api_key(config['key'])}")
+                
+        except Exception as e:
+            logger.error(f"保存配置失败：{str(e)}")
+            return False
+    
+    return True
+
+
+def _delete_api_provider(env_path: str) -> bool:
+    """删除API服务商"""
+    existing_providers = _get_existing_providers(env_path)
+    
+    if not existing_providers:
+        logger.warning("当前没有已配置的API服务商")
+        return True
+    
+    print("\n=== 删除API服务商 ===")
+    provider_list = list(existing_providers.keys())
+    
+    for i, provider in enumerate(provider_list, 1):
+        config = existing_providers[provider]
+        print(f"{i}. {provider}")
+        print(f"   BASE_URL: {config['base_url']}")
+        print(f"   KEY: {_mask_api_key(config['key'])}")
+    
+    while True:
+        choice = input(f"请选择要删除的服务商编号（1-{len(provider_list)}，输入0返回）: ").strip()
+        
+        if choice == '0':
+            return True
+        
+        if not choice.isdigit() or not (1 <= int(choice) <= len(provider_list)):
+            logger.error("无效选择，请重新输入")
+            continue
+        
+        provider_name = provider_list[int(choice) - 1]
+        
+        # 确认删除
+        confirm = input(f"⚠️  确认删除API服务商 {provider_name} 吗？(输入 'YES' 确认): ").strip()
+        if confirm != 'YES':
+            logger.info("操作已取消")
+            continue
+        
+        try:
+            # 从.env文件中删除配置
+            base_url_key = f"{provider_name}_BASE_URL"
+            api_key_key = f"{provider_name}_KEY"
+            
+            # 读取.env文件内容
+            with open(env_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            # 过滤掉要删除的配置行
+            new_lines = []
+            for line in lines:
+                line_stripped = line.strip()
+                if line_stripped and not line_stripped.startswith('#') and '=' in line_stripped:
+                    key = line_stripped.split('=')[0].strip()
+                    if key not in [base_url_key, api_key_key]:
+                        new_lines.append(line)
+                else:
+                    new_lines.append(line)
+            
+            # 写回文件
+            with open(env_path, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+            
+            logger.info(f"✅ API服务商 {provider_name} 已成功删除！")
+            
+            # 询问是否继续删除其他服务商
+            if input("\n是否继续删除其他API服务商？(y/N): ").strip().lower() != 'y':
+                break
+            
+            # 重新获取配置
+            existing_providers = _get_existing_providers(env_path)
+            provider_list = list(existing_providers.keys())
+            
+            if not provider_list:
+                logger.info("所有API服务商已删除完毕")
+                break
+            
+            print("\n剩余API服务商：")
+            for i, provider in enumerate(provider_list, 1):
+                config = existing_providers[provider]
+                print(f"{i}. {provider}")
+                print(f"   BASE_URL: {config['base_url']}")
+                print(f"   KEY: {_mask_api_key(config['key'])}")
+                
+        except Exception as e:
+            logger.error(f"删除配置失败：{str(e)}")
+            return False
+    
+    return True
+
+
+def _display_all_api_providers(env_path: str) -> bool:
+    """显示所有API服务商配置"""
+    existing_providers = _get_existing_providers(env_path)
+    
+    print("\n=== 所有API服务商配置 ===")
+    
+    if not existing_providers:
+        print("当前没有已配置的API服务商")
+        print("提示：选择菜单项1可以添加新的API服务商")
+    else:
+        for i, (provider, config) in enumerate(sorted(existing_providers.items()), 1):
+            print(f"{i}. {provider}")
+            print(f"   BASE_URL: {config['base_url']}")
+            print(f"   KEY: {_mask_api_key(config['key'])}")
+            print("   " + "="*50)
+        
+        print(f"总计: {len(existing_providers)} 个API服务商")
+    
+    input("\n按回车键继续...")
+    return True
+
 
 if __name__ == '__main__':
     main()
