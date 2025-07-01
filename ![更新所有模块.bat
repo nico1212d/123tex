@@ -14,7 +14,7 @@ REM 检查Python是否存在
 if exist "%PYTHON_PATH%" (
     echo 使用内置Python: %PYTHON_PATH%
 ) else (
-    echo 错误：未找到内置Python
+    echo 错误：未找到内置Python.
     echo 路径: %PYTHON_PATH%
     pause
     exit /b 1
@@ -27,9 +27,9 @@ echo 开始执行更新脚本...
 
 echo.
 if %errorlevel% equ 0 (
-    echo 更新完成！
+    echo 更新完成！.
 ) else (
-    echo 更新过程中出现错误！
+    echo 更新过程中出现错误！.
 )
 echo 按任意键退出...
 pause >nul
