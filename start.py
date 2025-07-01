@@ -955,8 +955,8 @@ def import_openie_file():
         # 使用内置的 Python 解释器
         python_path = get_absolute_path('runtime/python31211/bin/python.exe')
         return create_cmd_window(
-            get_absolute_path('modules/MaiBot/scripts'), 
-            f'"{python_path}" import_openie.py')
+            get_absolute_path('modules/MaiBot'), 
+            f'"{python_path}" scripts/import_openie.py')
     except Exception as e:
         logger.error(f"错误：启动OpenIE导入工具时出现异常：{str(e)}")
         return False
@@ -985,16 +985,16 @@ def start_maibot_learning():
         # 使用内置的 Python 解释器
         python_path = get_absolute_path('runtime/python31211/bin/python.exe')
         
-        # 构建批处理命令，依次执行三个脚本
+        # 构建批处理命令，依次执行三个脚本，工作目录在MaiBot根目录
         learning_command = (
-            f'"{python_path}" raw_data_preprocessor.py && '
-            f'"{python_path}" info_extraction.py && '
-            f'"{python_path}" import_openie.py && '
+            f'"{python_path}" scripts/raw_data_preprocessor.py && '
+            f'"{python_path}" scripts/info_extraction.py && '
+            f'"{python_path}" scripts/import_openie.py && '
             'echo. && echo 🎉 麦麦学习流程已完成！ && pause'
         )
         
         logger.info("请在弹出的命令行窗口中查看学习进度")
-        return create_cmd_window(scripts_dir, learning_command)
+        return create_cmd_window(get_absolute_path('modules/MaiBot'), learning_command)
         
     except Exception as e:
         logger.error(f"错误：启动麦麦学习流程时出现异常：{str(e)}")
