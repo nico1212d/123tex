@@ -952,9 +952,11 @@ def import_openie_file():
     try:
         logger.info("正在启动OpenIE文件导入工具...")
         logger.info("请在弹出的命令行窗口中按照提示选择要导入的文件")
+        # 使用内置的 Python 解释器
+        python_path = get_absolute_path('runtime/python31211/bin/python.exe')
         return create_cmd_window(
             get_absolute_path('modules/MaiBot/scripts'), 
-            'python import_openie.py')
+            f'"{python_path}" import_openie.py')
     except Exception as e:
         logger.error(f"错误：启动OpenIE导入工具时出现异常：{str(e)}")
         return False
@@ -980,11 +982,14 @@ def start_maibot_learning():
         logger.info("开始麦麦学习流程...")
         logger.info("这将依次执行：数据预处理 → 信息提取 → OpenIE导入")
         
+        # 使用内置的 Python 解释器
+        python_path = get_absolute_path('runtime/python31211/bin/python.exe')
+        
         # 构建批处理命令，依次执行三个脚本
         learning_command = (
-            'python raw_data_preprocessor.py && '
-            'python info_extraction.py && '
-            'python import_openie.py && '
+            f'"{python_path}" raw_data_preprocessor.py && '
+            f'"{python_path}" info_extraction.py && '
+            f'"{python_path}" import_openie.py && '
             'echo. && echo 🎉 麦麦学习流程已完成！ && pause'
         )
         
