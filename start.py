@@ -1683,7 +1683,7 @@ def _add_new_api_provider(env_path: str) -> bool:
         print("\n请选择添加方式：")
         
         if available_providers:
-            print("\n推荐的API服务商：")
+            print("\n预配置的API服务商（即开即用）：")
             provider_list = list(available_providers.keys())
             for i, provider_key in enumerate(provider_list, 1):
                 provider_info = available_providers[provider_key]
