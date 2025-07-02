@@ -426,7 +426,7 @@ def _add_group_to_list(config):
             config['chat']['group_list'] = current_list
             logger.info(f"群号 {group_id} 已添加到群组列表")
         
-        if input("是否继续添加其他群号? (y/N): ").strip().lower() != 'y':
+        if input("是否继续添加其他群号? (y/N): "):
             break
 
 
@@ -1165,6 +1165,7 @@ class MenuManager:
         other_group = MenuGroup("其他功能：", [
             MenuItem("16", "快捷打开配置文件", lambda: log_operation_result("打开配置文件", open_config_file())),
             MenuItem("17", "管理API服务商", lambda: log_operation_result("管理API服务商", add_api_provider())),
+            MenuItem("18", "MaiBot模型配置管理", lambda: log_operation_result("模型配置管理", change_model_provider())),
         ])
         
         # 退出组
@@ -1878,8 +1879,10 @@ def _modify_api_provider(env_path: str) -> bool:
     print("\n=== 修改现有API服务商 ===")
     provider_list = list(existing_providers.keys())
     
+    
     for i, provider in enumerate(provider_list, 1):
         config = existing_providers[provider]
+       
         print(f"{i}. {provider}")
         print(f"   BASE_URL: {config['base_url']}")
         print(f"   KEY: {_mask_api_key(config['key'])}")
@@ -2067,5 +2070,410 @@ def _display_all_api_providers(env_path: str) -> bool:
     return True
 
 
-if __name__ == '__main__':
+def change_model_provider():
+    """交互式配置模型"""
+    config_path = get_absolute_path('modules/MaiBot/config/bot_config.toml')
+    env_path = get_absolute_path('modules/MaiBot/.env')
+    
+    # 检查配置文件是否存在
+    if not os.path.exists(config_path):
+        logger.error(f"错误：找不到配置文件 {config_path}")
+        return False
+    
+    if not os.path.exists(env_path):
+        logger.error(f"错误：找不到环境配置文件 {env_path}")
+        return False
+    
+    try:
+        # 获取可用的API提供商
+        existing_providers = _get_existing_providers(env_path)
+        if not existing_providers:
+            logger.error("错误：没有配置任何API提供商，请先配置API提供商")
+            return False
+        
+        # 读取当前配置
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = tomlkit.load(f)
+        
+        if 'model' not in config:
+            logger.error("错误：配置文件中没有找到 [model] 配置段")
+            return False
+        
+        # 获取所有模型配置段
+        model_sections = _get_model_sections(config['model'])
+        
+        if not model_sections:
+            logger.error("错误：没有找到任何模型配置段")
+            return False
+        
+        while True:
+            print("\n=== 模型配置管理 ===")
+            print("当前模型配置：")
+            
+            # 显示所有模型配置
+            for i, (section_name, section_config) in enumerate(model_sections, 1):
+                provider = section_config.get('provider', '未设置')
+                model_name = section_config.get('name', '未设置')
+                temp = section_config.get('temp', '未设置')
+                thinking = section_config.get('enable_thinking', '未设置')
+                
+                # 获取中文显示名称
+                display_name = _get_model_display_name(section_name)
+                
+                print(f"{i:2d}. {display_name}")
+                print(f"     配置段: [{section_name}]")
+                print(f"     模型: {model_name}")
+                print(f"     提供商: {provider}")
+                print(f"     温度: {temp}")
+                if thinking != '未设置':
+                    print(f"     思考功能: {thinking}")
+                print("     " + "-"*50)
+            
+            print(" 0. 返回主菜单")
+            
+            choice = input(f"请选择要配置的模型（1-{len(model_sections)}，0返回）: ").strip()
+            
+            if choice == '0':
+                logger.info("已退出模型配置")
+                break
+            
+            if not choice.isdigit() or not (1 <= int(choice) <= len(model_sections)):
+                logger.error("无效选择，请重新输入")
+                continue
+            
+            selected_index = int(choice) - 1
+            section_name, section_config = model_sections[selected_index]
+            
+            # 配置选定的模型
+            if _configure_single_model(section_name, section_config, existing_providers):
+                # 保存配置
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    tomlkit.dump(config, f)
+                display_name = _get_model_display_name(section_name)
+                logger.info(f"✅ 模型 {display_name} [{section_name}] 配置已保存！")
+                
+                # 更新模型配置列表（可能有变化）
+                model_sections = _get_model_sections(config['model'])
+            else:
+                logger.warning("模型配置被取消")
+                
+    except Exception as e:
+        logger.error(f"配置模型失败：{str(e)}")
+        return False
+    
+    return True
+
+
+def _get_model_sections(model_config: dict) -> list:
+    """获取所有模型配置段
+    
+    Args:
+        model_config: 模型配置字典
+        
+    Returns:
+        list: [(section_name, section_config), ...] 模型配置段列表
+    """
+    model_sections = []
+    
+    for key, value in model_config.items():
+        if isinstance(value, dict) and 'provider' in value:
+            model_sections.append((key, value))
+    
+    return model_sections
+
+
+def _configure_single_model(section_name: str, section_config: dict, available_providers: dict) -> bool:
+    """配置单个模型的所有参数
+    
+    Args:
+        section_name: 配置段名称
+        section_config: 配置段字典
+        available_providers: 可用的提供商字典
+        
+    Returns:
+        bool: 是否成功配置
+    """
+    display_name = _get_model_display_name(section_name)
+    print(f"\n=== 配置模型: {display_name} ===")
+    print(f"配置段: [{section_name}]")
+    
+    # 显示当前配置
+    current_provider = section_config.get('provider', '未设置')
+    current_model = section_config.get('name', '未设置')
+    current_temp = section_config.get('temp', '未设置')
+    current_thinking = section_config.get('enable_thinking')
+    current_pri_in = section_config.get('pri_in', '未设置')
+    current_pri_out = section_config.get('pri_out', '未设置')
+    
+    print("当前配置：")
+    print(f"  提供商: {current_provider}")
+    print(f"  模型名称: {current_model}")
+    print(f"  温度: {current_temp}")
+    if current_thinking is not None:
+        print(f"  思考功能: {current_thinking}")
+    print(f"  输入价格: {current_pri_in}")
+    print(f"  输出价格: {current_pri_out}")
+    print("="*50)
+    
+    # 1. 配置提供商
+    print("\n1. 配置提供商")
+    provider_list = list(available_providers.keys())
+    print("可用的提供商：")
+    for i, provider in enumerate(provider_list, 1):
+        marker = " (当前)" if provider == current_provider else ""
+        print(f"  {i}. {provider}{marker}")
+    
+    print("  0. 保持当前提供商")
+    
+    while True:
+        provider_choice = input(f"选择提供商（1-{len(provider_list)}，0保持不变）: ").strip()
+        
+        if provider_choice == '0':
+            new_provider = current_provider
+            break
+        elif provider_choice.isdigit() and 1 <= int(provider_choice) <= len(provider_list):
+            new_provider = provider_list[int(provider_choice) - 1]
+            break
+        else:
+            print("无效选择，请重新输入")
+    
+    # 更新提供商
+    section_config['provider'] = new_provider
+    
+    # 2. 配置模型名称
+    print("\n2. 配置模型名称")
+    print(f"当前模型名称: {current_model}")
+    new_model = input("输入新的模型名称（直接回车保持不变）: ").strip()
+    if new_model:
+        section_config['name'] = new_model
+        print(f"模型名称已更新为: {new_model}")
+    else:
+        print("保持原有模型名称")
+    
+    # 3. 配置温度
+    print("\n3. 配置温度")
+    print(f"当前温度: {current_temp}")
+    
+    # 获取提供商的温度范围
+    provider_defaults = _get_provider_defaults(new_provider)
+    temp_min, temp_max = provider_defaults['temp_range']
+    print(f"提供商 {new_provider} 支持的温度范围: {temp_min} - {temp_max}")
+    
+    while True:
+        new_temp = input(f"输入新的温度值（{temp_min}-{temp_max}，直接回车保持不变）: ").strip()
+        if not new_temp:
+            print("保持原有温度")
+            break
+        
+        try:
+            temp_value = float(new_temp)
+            if temp_min <= temp_value <= temp_max:
+                section_config['temp'] = temp_value
+                print(f"温度已更新为: {temp_value}")
+                break
+            else:
+                print(f"温度值超出范围 {temp_min}-{temp_max}，请重新输入")
+        except ValueError:
+            print("无效的温度值，请输入数字")
+    
+    # 4. 配置思考功能（如果支持）
+    if provider_defaults['supports_thinking']:
+        print(f"\n4. 配置思考功能")
+        if current_thinking is not None:
+            print(f"当前思考功能: {current_thinking}")
+        else:
+            print("当前未配置思考功能")
+        
+        thinking_choice = input("是否启用思考功能？(y/n/直接回车保持不变): ").strip().lower()
+        if thinking_choice == 'y':
+            section_config['enable_thinking'] = True
+            print("思考功能已启用")
+            
+            # 配置思考预算
+            current_budget = section_config.get('thinking_budget', 3000)
+            new_budget = input(f"输入思考最长长度（当前: {current_budget}，直接回车保持不变）: ").strip()
+            if new_budget:
+                try:
+                    section_config['thinking_budget'] = int(new_budget)
+                    print(f"思考预算已更新为: {new_budget}")
+                except ValueError:
+                    print("无效的预算值，保持原有配置")
+        elif thinking_choice == 'n':
+            section_config['enable_thinking'] = False
+            # 移除思考预算配置
+            if 'thinking_budget' in section_config:
+                del section_config['thinking_budget']
+            print("思考功能已禁用")
+        else:
+            print("保持原有思考功能配置")
+    else:
+        # 提供商不支持思考，确保禁用
+        if 'enable_thinking' in section_config:
+            section_config['enable_thinking'] = False
+        if 'thinking_budget' in section_config:
+            del section_config['thinking_budget']
+        print(f"\n注意：提供商 {new_provider} 不支持思考功能，已自动禁用")
+    
+    # 5. 配置价格信息
+    print(f"\n5. 配置价格信息")
+    print(f"当前输入价格: {current_pri_in}")
+    print(f"当前输出价格: {current_pri_out}")
+    
+    update_price = input("是否更新价格信息？(y/N): ").strip().lower()
+    if update_price == 'y':
+        # 输入价格
+        new_pri_in = input(f"输入新的输入价格（当前: {current_pri_in}，直接回车保持不变）: ").strip()
+        if new_pri_in:
+            try:
+                section_config['pri_in'] = float(new_pri_in)
+                print(f"输入价格已更新为: {new_pri_in}")
+            except ValueError:
+                print("无效的价格值，保持原有配置")
+        
+        # 输出价格
+        new_pri_out = input(f"输入新的输出价格（当前: {current_pri_out}，直接回车保持不变）: ").strip()
+        if new_pri_out:
+            try:
+                section_config['pri_out'] = float(new_pri_out)
+                print(f"输出价格已更新为: {new_pri_out}")
+            except ValueError:
+                print("无效的价格值，保持原有配置")
+    else:
+        print("保持原有价格配置")
+    
+    # 确认配置
+    print("\n=== 配置完成 ===")
+    print(f"模型: {display_name}")
+    print(f"配置段: [{section_name}]")
+    print("新配置：")
+    print(f"  提供商: {section_config.get('provider')}")
+    print(f"  模型名称: {section_config.get('name')}")
+    print(f"  温度: {section_config.get('temp')}")
+    if 'enable_thinking' in section_config:
+        print(f"  思考功能: {section_config.get('enable_thinking')}")
+        if section_config.get('enable_thinking') and 'thinking_budget' in section_config:
+            print(f"  思考预算: {section_config.get('thinking_budget')}")
+    print(f"  输入价格: {section_config.get('pri_in')}")
+    print(f"  输出价格: {section_config.get('pri_out')}")
+    
+    confirm = input("确认保存这些配置？(Y/n): ").strip().lower()
+    return confirm in ['', 'y', 'yes']
+
+def _get_provider_defaults(provider: str) -> dict:
+    """获取提供商的默认配置
+    
+    Args:
+        provider: 提供商名称
+        
+    Returns:
+        dict: 提供商默认配置
+    """
+    provider_defaults = {
+        'OPENAI': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'ANTHROPIC': {
+            'temp_range': (0.0, 1.0),
+            'default_temp': 0.7,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'GOOGLE': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'SILICONFLOW': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': True,  # 部分模型支持
+            'max_tokens_default': 2048
+        },
+        'DEEP_SEEK': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': True,  # DeepSeek支持思考
+            'max_tokens_default': 2048
+        },
+        'CHAT_ANY_WHERE': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'BAILIAN': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'MOONSHOT': {
+            'temp_range': (0.0, 1.0),
+            'default_temp': 0.3,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'ZHIPU': {
+            'temp_range': (0.01, 0.99),
+            'default_temp': 0.7,
+            'supports_thinking': False,
+            'max_tokens_default': 2048
+        },
+        'QWEN': {
+            'temp_range': (0.0, 2.0),
+            'default_temp': 0.7,
+            'supports_thinking': True,  # Qwen3 支持思考
+            'max_tokens_default': 2048
+        }
+    }
+    
+    # 返回提供商配置，如果找不到则返回通用默认配置
+    return provider_defaults.get(provider, {
+        'temp_range': (0.0, 2.0),
+        'default_temp': 0.7,
+        'supports_thinking': False,
+        'max_tokens_default': 2048
+    })
+
+def _get_model_display_name_mapping() -> dict:
+    """获取模型配置段名称到中文显示名称的映射表
+    
+    Returns:
+        dict: {英文配置段名: 中文显示名称}
+    """
+    return {
+        'utils': '组件模型 - 表情包/取名等功能',
+        'utils_small': '小型组件模型 - 高频使用，建议免费',
+        'replyer_1': '首要回复模型 - 主要聊天+表达学习',
+        'replyer_2': '次要回复模型 - 一般聊天模式',
+        'memory_summary': '记忆概括模型 - 记忆总结',
+        'vlm': '图像识别模型 - 视觉理解',
+        'planner': '决策模型 - 麦麦行为规划',
+        'relation': '关系处理模型 - 人际关系管理',
+        'embedding': '嵌入模型 - 文本向量化',
+        'focus_working_memory': '专注聊天 - 工作记忆模型',
+        'focus_tool_use': '专注聊天 - 工具调用模型',
+        'lpmm_entity_extract': 'LPMM知识库 - 实体提取模型',
+        'lpmm_rdf_build': 'LPMM知识库 - RDF构建模型',
+        'lpmm_qa': 'LPMM知识库 - 问答模型'
+    }
+
+
+def _get_model_display_name(section_name: str) -> str:
+    """获取模型配置段的中文显示名称
+    
+    Args:
+        section_name: 英文配置段名称
+        
+    Returns:
+        str: 中文显示名称，如果没有映射则返回原名称
+    """
+    mapping = _get_model_display_name_mapping()
+    return mapping.get(section_name, section_name)
+
+if __name__ == "__main__":
     main()
