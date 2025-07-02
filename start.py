@@ -1584,20 +1584,221 @@ def _mask_api_key(api_key: str) -> str:
         return '*' * 10
 
 
+def _get_predefined_api_providers() -> dict:
+    """获取预定义的API服务商列表
+    
+    Returns:
+        dict: 预定义服务商配置，格式为 {provider_name: {'name': display_name, 'base_url': url, 'description': desc}}
+    """
+    return {
+        'OPENAI': {
+            'name': 'OpenAI',
+            'base_url': 'https://api.openai.com/v1',
+            'description': 'OpenAI 官方 API'
+        },
+        'ANTHROPIC': {
+            'name': 'Anthropic (Claude)',
+            'base_url': 'https://api.anthropic.com/v1',
+            'description': 'Anthropic Claude API'
+        },
+        'GOOGLE': {
+            'name': 'Google AI (Gemini)',
+            'base_url': 'https://generativelanguage.googleapis.com/v1',
+            'description': 'Google Gemini API'
+        },
+        'MOONSHOT': {
+            'name': 'Moonshot AI (Kimi)',
+            'base_url': 'https://api.moonshot.cn/v1',
+            'description': 'Moonshot AI Kimi 模型'
+        },
+        'ZHIPU': {
+            'name': '智谱AI (GLM)',
+            'base_url': 'https://open.bigmodel.cn/api/paas/v4',
+            'description': '智谱AI GLM 模型'
+        },
+        'QWEN': {
+            'name': '通义千问',
+            'base_url': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+            'description': '阿里云通义千问'
+        },
+        'DOUBAN': {
+            'name': '豆包 (字节跳动)',
+            'base_url': 'https://ark.cn-beijing.volces.com/api/v3',
+            'description': '字节跳动豆包模型'
+        },
+        'MINIMAX': {
+            'name': 'MiniMax',
+            'base_url': 'https://api.minimax.chat/v1',
+            'description': 'MiniMax 海螺AI'
+        },
+        'BAICHUAN': {
+            'name': '百川智能',
+            'base_url': 'https://api.baichuan-ai.com/v1',
+            'description': '百川智能AI模型'
+        },
+        'XUNFEI': {
+            'name': '讯飞星火',
+            'base_url': 'https://spark-api-open.xf-yun.com/v1',
+            'description': '讯飞星火认知大模型'
+        },
+        'SENSETIME': {
+            'name': '商汤科技',
+            'base_url': 'https://api.sensenova.cn/v1',
+            'description': '商汤日日新大模型'
+        },
+        'CLOUDFLARE': {
+            'name': 'Cloudflare Workers AI',
+            'base_url': 'https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/v1',
+            'description': 'Cloudflare AI 服务'
+        },
+        'TOGETHER': {
+            'name': 'Together AI',
+            'base_url': 'https://api.together.xyz/v1',
+            'description': 'Together AI 开源模型托管'
+        },
+        'GROQ': {
+            'name': 'Groq',
+            'base_url': 'https://api.groq.com/openai/v1',
+            'description': 'Groq 高速推理'
+        }
+    }
+
+
 def _add_new_api_provider(env_path: str) -> bool:
     """添加新的API服务商"""
-    from dotenv import set_key
     
     print("\n=== 添加新的API服务商 ===")
-    print("注意：服务商名称将用于生成环境变量，建议使用大写英文")
-    print("例如：OPENAI, ANTHROPIC, GOOGLE, SILICONFLOW 等")
-    print("生成格式：{提供商名称}_BASE_URL 和 {提供商名称}_KEY")
-    print("======================")
     
     existing_providers = _get_existing_providers(env_path)
+    predefined_providers = _get_predefined_api_providers()
+    
+    # 过滤掉已存在的服务商
+    available_providers = {k: v for k, v in predefined_providers.items() if k not in existing_providers}
+    
     if existing_providers:
         print(f"当前已配置的API服务商：{', '.join(sorted(existing_providers.keys()))}")
         print("======================")
+    
+    while True:
+        print("\n请选择添加方式：")
+        
+        if available_providers:
+            print("\n推荐的API服务商：")
+            provider_list = list(available_providers.keys())
+            for i, provider_key in enumerate(provider_list, 1):
+                provider_info = available_providers[provider_key]
+                print(f"{i:2d}. {provider_info['name']} - {provider_info['description']}")
+            
+            print(f"\n{len(provider_list)+1:2d}. 自定义添加其他服务商")
+            print(" 0. 返回上级菜单")
+            
+            choice = input(f"\n请选择（1-{len(provider_list)+1}，0返回）: ").strip()
+            
+            if choice == '0':
+                return True
+            elif choice.isdigit() and 1 <= int(choice) <= len(provider_list):
+                # 选择预定义服务商
+                selected_provider = provider_list[int(choice) - 1]
+                provider_info = available_providers[selected_provider]
+                return _add_predefined_provider(env_path, selected_provider, provider_info)
+            elif choice == str(len(provider_list) + 1):
+                # 自定义添加
+                return _add_custom_provider(env_path, existing_providers)
+            else:
+                logger.error("无效选择，请重新输入")
+                continue
+        else:
+            print("\n所有推荐的API服务商都已配置！")
+            print("1. 自定义添加其他服务商")
+            print("0. 返回上级菜单")
+            
+            choice = input("请选择（1自定义，0返回）: ").strip()
+            
+            if choice == '0':
+                return True
+            elif choice == '1':
+                return _add_custom_provider(env_path, existing_providers)
+            else:
+                logger.error("无效选择，请重新输入")
+                continue
+
+
+def _add_predefined_provider(env_path: str, provider_key: str, provider_info: dict) -> bool:
+    """添加预定义的API服务商
+    
+    Args:
+        env_path: .env文件路径
+        provider_key: 服务商键名
+        provider_info: 服务商信息
+        
+    Returns:
+        bool: 是否成功添加
+    """
+    from dotenv import set_key
+    
+    print(f"\n=== 添加 {provider_info['name']} ===")
+    print(f"服务商：{provider_info['name']}")
+    print(f"描述：{provider_info['description']}")
+    print(f"默认API URL：{provider_info['base_url']}")
+    print("============================")
+    
+    # 确认是否使用默认URL
+    use_default = input("是否使用默认API URL？(Y/n): ").strip().lower()
+    if use_default in ['', 'y', 'yes']:
+        api_url = provider_info['base_url']
+    else:
+        while True:
+            api_url = input("请输入自定义的API URL: ").strip()
+            if not api_url:
+                logger.error("API URL不能为空，请重新输入")
+                continue
+            if not (api_url.startswith('http://') or api_url.startswith('https://')):
+                logger.warning("警告：API URL 通常应该以 http:// 或 https:// 开头")
+                confirm = input("确定要继续吗？(y/N): ").strip().lower()
+                if confirm != 'y':
+                    continue
+            break
+    
+    # 输入API Key
+    api_key = input(f"请输入 {provider_info['name']} 的API Key（可为空，稍后再配置）: ").strip()
+    
+    try:
+        # 保存到.env文件
+        base_url_key = f"{provider_key}_BASE_URL"
+        api_key_key = f"{provider_key}_KEY"
+        
+        set_key(env_path, base_url_key, api_url)
+        set_key(env_path, api_key_key, api_key if api_key else "")
+        
+        logger.info(f"✅ API服务商 {provider_info['name']} ({provider_key}) 已成功添加！")
+        print("环境变量已设置：")
+        print(f"  {base_url_key}={api_url}")
+        print(f"  {api_key_key}={_mask_api_key(api_key)}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"保存配置失败：{str(e)}")
+        return False
+
+
+def _add_custom_provider(env_path: str, existing_providers: dict) -> bool:
+    """自定义添加API服务商
+    
+    Args:
+        env_path: .env文件路径
+        existing_providers: 现有服务商配置
+        
+    Returns:
+        bool: 是否成功添加
+    """
+    from dotenv import set_key
+    
+    print("\n=== 自定义添加API服务商 ===")
+    print("注意：服务商名称将用于生成环境变量，建议使用大写英文")
+    print("例如：OPENAI, ANTHROPIC, GOOGLE 等")
+    print("生成格式：{提供商名称}_BASE_URL 和 {提供商名称}_KEY")
+    print("===============================")
     
     while True:
         # 输入服务商名称
