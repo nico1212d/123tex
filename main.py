@@ -176,7 +176,7 @@ def run_python_script(script_name: str) -> bool:
             [str(python_path), str(target_script)],
             capture_output=False,  # 保持输出到控制台
             text=True,
-            timeout=3000,  # 5分钟超时
+            timeout=30000,  # 5分钟超时
             cwd=str(current_dir)  # 设置工作目录
         )
         
