@@ -864,7 +864,7 @@ def delete_maibot_memory():
     try:
         # 确认删除
         confirm = input("⚠️  警告：此操作将删除麦麦的所有记忆，包括聊天记录、用户数据等，无法恢复！\n确定要继续吗？(输入 'YES' 确认): ").strip()
-        if confirm != 'YES':
+        if confirm.upper() != 'YES':
             logger.info("操作已取消")
             return False
         
@@ -902,7 +902,7 @@ def confirm_dangerous_operation(operation_name: str) -> bool:
         bool: 用户是否确认操作
     """
     confirm = input(f"⚠️  警告：此操作将{operation_name}，无法恢复！\n确定要继续吗？(输入 'YES' 确认): ").strip()
-    if confirm != 'YES':
+    if confirm.upper() != 'YES':
         logger.info("操作已取消")
         return False
     return True
@@ -1992,7 +1992,7 @@ def _delete_api_provider(env_path: str) -> bool:
         
         # 确认删除
         confirm = input(f"⚠️  确认删除API服务商 {provider_name} 吗？(输入 'YES' 确认): ").strip()
-        if confirm != 'YES':
+        if confirm.upper() != 'YES':
             logger.info("操作已取消")
             continue
         
