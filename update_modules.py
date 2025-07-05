@@ -348,13 +348,13 @@ def main():
                 'name': 'MaiBot主仓库',
                 'path': script_dir / 'modules' / 'MaiBot',
                 'remote_urls': REMOTE_URLS['maibot'],
-                'force_reset': False
+                'force_reset': True
             },
             {
                 'name': 'MaiBot-Napcat-Adapter适配器仓库',
                 'path': script_dir / 'modules' / 'MaiBot-Napcat-Adapter',
                 'remote_urls': REMOTE_URLS['adapter'],
-                'force_reset': False
+                'force_reset': True
             }
         ]
     
