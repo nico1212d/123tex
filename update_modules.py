@@ -144,6 +144,21 @@ def run_git_command(repo_path, command):
     else:
         git_command = command
     
+    # 为Git命令添加SSL和网络配置，解决证书验证问题
+    # 这些配置只对网络相关的Git操作有效
+    if any(cmd in command for cmd in ['fetch', 'pull', 'push', 'clone', 'remote']):
+        # 设置Git配置以解决SSL证书问题
+        git_config_commands = [
+            f'"{GIT_COMMAND}" config http.sslverify false',
+            f'"{GIT_COMMAND}" config http.sslbackend schannel',
+            f'"{GIT_COMMAND}" config http.schannelCheckRevoke false',
+            f'"{GIT_COMMAND}" config http.schannelUseSSLCAInfo false'
+        ]
+        
+        # 先设置Git配置
+        for config_cmd in git_config_commands:
+            run_command(config_cmd, repo_path)
+    
     return run_command(git_command, repo_path)
 
 def install_requirements(repo_path, repo_name):
@@ -201,10 +216,7 @@ def update_repository(repo_path, repo_name, remote_urls=None, force_reset=False)
         if not run_git_command(repo_path, 'git clean -fd'):
             print("❌ git clean -fd 失败")
             return False
-        if not run_git_command(repo_path, 'git fetch --all'):
-            print("❌ git fetch --all 失败")
-            return False
-        # 下面的 pull 会被 remote_urls 逻辑覆盖
+        # 跳过 fetch --all，因为后面会设置新的远程仓库并拉取
 
     # 如果提供了远程URL列表，尝试每个URL直到成功
     pull_success = False
@@ -224,12 +236,21 @@ def update_repository(repo_path, repo_name, remote_urls=None, force_reset=False)
                 print("正在拉取最新代码...")
                 if force_reset:
                     # 强制拉取远程最新代码并覆盖本地
-                    if run_git_command(repo_path, 'git reset --hard origin/HEAD') or run_git_command(repo_path, 'git pull --rebase') or run_git_command(repo_path, 'git pull'):
-                        print(f"✅ {repo_name} 强制更新完成")
-                        pull_success = True
-                        break
+                    # 先fetch获取最新的远程引用
+                    if run_git_command(repo_path, 'git fetch origin'):
+                        print("✅ 成功获取远程更新")
+                        # 然后强制重置到远程分支
+                        if (run_git_command(repo_path, 'git reset --hard origin/main') or 
+                            run_git_command(repo_path, 'git reset --hard origin/master') or
+                            run_git_command(repo_path, 'git pull --rebase') or 
+                            run_git_command(repo_path, 'git pull')):
+                            print(f"✅ {repo_name} 强制更新完成")
+                            pull_success = True
+                            break
+                        else:
+                            print("❌ 强制重置失败，尝试下一个仓库")
                     else:
-                        print("❌ 强制拉取失败，尝试下一个仓库")
+                        print("❌ 获取远程更新失败，尝试下一个仓库")
                 else:
                     if run_git_command(repo_path, "git pull"):
                         print(f"✅ {repo_name} 更新完成")
